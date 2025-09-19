@@ -8,10 +8,9 @@ class Location:
         self.items = items if items is not None else []
 
     def describe(self):
-        print(f"**{self.name}**")
-        print(self.description)
-        if self.exits:
-            print("Exits:", ", ".join(self.exits.keys()))
+        description = f"**{self.name}**\n"
+        description += f"{self.description}\n"
+        return description
 
 class Player:
     def __init__(self, name, current_location):
@@ -21,12 +20,40 @@ class Player:
     def move(self, direction):
         if direction in self.current_location.exits:
             self.current_location = self.current_location.exits[direction]
-            print(f"You go {direction}.")
-            self.current_location.describe()
+            return f"You go {direction}.\n\n{self.current_location.describe()}"
         else:
-            print("You can't go that way.")
+            return "You can't go that way."
 
+import os
+import platform
 import json
+
+def clear_screen():
+    """Clears the console screen."""
+    if platform.system() == "Windows":
+        os.system('cls')
+    else:
+        os.system('clear')
+
+def display_game_state(player, message):
+    """Clears the screen and displays the game state."""
+    clear_screen()
+
+    # Status Panel
+    print("=" * 40)
+    print(f"| Player: {player.name:<10} | Location: {player.current_location.name:<10} |")
+    print("=" * 40)
+
+    # Action Result
+    print(f"\n{message}\n")
+
+    # Command Menu
+    print("-" * 40)
+    commands = "[look] "
+    for direction in player.current_location.exits:
+        commands += f"[go {direction}] "
+    print(commands)
+    print("-" * 40)
 
 def load_game_data(filepath):
     """Loads game data from a JSON file."""
@@ -50,10 +77,11 @@ def main():
     # Player
     start_location_id = game_data["start_location"]
     player = Player("Hero", locations[start_location_id])
-    player.current_location.describe()
 
     # Game Loop
+    message = player.current_location.describe()
     while True:
+        display_game_state(player, message)
         command = input("> ").lower().strip()
         if not command:
             continue
@@ -65,15 +93,15 @@ def main():
             print("Thanks for playing!")
             break
         elif verb == "look":
-            player.current_location.describe()
+            message = player.current_location.describe()
         elif verb == "go":
             if len(parts) > 1:
                 direction = parts[1]
-                player.move(direction)
+                message = player.move(direction)
             else:
-                print("Go where?")
+                message = "Go where?"
         else:
-            print("Unknown command.")
+            message = "Unknown command."
 
 if __name__ == "__main__":
     main()
