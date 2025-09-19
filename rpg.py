@@ -86,10 +86,14 @@ class Location:
         self.npcs = npcs if npcs is not None else []
         self.monsters = monsters if monsters is not None else []
         self.items = items if items is not None else []
+        self.conditional_exits = []
 
     def describe(self, player):
         description = f"**{self.name}**\n"
         description += f"{self.description}\n"
+        for c_exit in self.conditional_exits:
+            if player.check_conditions(c_exit.conditions):
+                description += c_exit.description + "\n"
         if self.npcs:
             description += "You see: " + ", ".join(npc.name for npc in self.npcs) + "\n"
         if self.monsters:
@@ -136,23 +140,47 @@ class Player(Character):
         self.current_location = current_location
         self.previous_location = current_location
         self.status_effects = {}
+        self.quests = {}
 
     def move(self, direction):
         if direction in self.current_location.exits:
             self.previous_location = self.current_location
             self.current_location = self.current_location.exits[direction]
             return True
-        else:
-            return False
+
+        # Check conditional exits
+        for c_exit in self.current_location.conditional_exits:
+            if c_exit.direction == direction:
+                if self.check_conditions(c_exit.conditions):
+                    self.previous_location = self.current_location
+                    self.current_location = c_exit.destination
+                    return True
+
+        return False
 
     def retreat(self):
         self.current_location = self.previous_location
+
+    def check_conditions(self, conditions):
+        """Checks if the player meets a list of conditions."""
+        for condition in conditions:
+            if condition['type'] == 'has_item':
+                if not any(item.id == condition['item_id'] for item in self.inventory):
+                    return False
+            elif condition['type'] == 'quest_completed':
+                if self.quests.get(condition['quest_id']) != 'completed':
+                    return False
+            # Add other condition types here in the future
+        return True
 
 import os
 import platform
 import json
 import random
 import copy
+import collections
+
+ConditionalExit = collections.namedtuple('ConditionalExit', ['direction', 'destination', 'description', 'conditions'])
 
 def clear_screen():
     """Clears the console screen."""
@@ -259,6 +287,16 @@ def get_available_actions(player, game_mode, menus):
                     action['command'] = definition["command"].format(monster=it)
 
                 actions.append(action)
+
+    # Add conditional exits to actions if conditions are met
+    for c_exit in player.current_location.conditional_exits:
+        if player.check_conditions(c_exit.conditions):
+            action = {
+                "text": f"Go {c_exit.direction} -> {c_exit.destination.name}",
+                "command": f"go {c_exit.direction}",
+            }
+            actions.append(action)
+
     return actions
 
 def load_game_data(filepath):
@@ -361,6 +399,18 @@ def load_world_from_data(game_data):
 
         location.items = [all_items[item_id] for item_id in loc_data.get("item_ids", [])]
 
+        # Load conditional exits
+        location.conditional_exits = []
+        for c_exit_data in loc_data.get("conditional_exits", []):
+            destination_location = all_locations[c_exit_data['destination_id']]
+            c_exit = ConditionalExit(
+                direction=c_exit_data['direction'],
+                destination=destination_location,
+                description=c_exit_data['description'],
+                conditions=c_exit_data['conditions']
+            )
+            location.conditional_exits.append(c_exit)
+
     # --- Player Creation ---
     player_data = game_data["player"]
     start_location = all_locations[player_data["start_location_id"]]
@@ -369,6 +419,7 @@ def load_world_from_data(game_data):
         "player", player_data["name"], start_location, player_data["hp"], player_data["attack_power"]
     )
     player.inventory = inventory
+    player.quests = player_data.get("quests", {})
 
     return player, game_data.get("menus", {})
 
