@@ -57,6 +57,23 @@ class Location:
             description += "On the ground: " + ", ".join(item.name for item in self.items) + "\n"
         return description
 
+class CityLocation(Location):
+    pass
+
+class WildernessLocation(Location):
+    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None, spawn_chance=0.0):
+        super().__init__(name, description, exits, npcs, monsters, items)
+        self.spawn_chance = spawn_chance
+
+class DungeonLocation(Location):
+    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None, hazard_description=""):
+        super().__init__(name, description, exits, npcs, monsters, items)
+        self.hazard_description = hazard_description
+
+    def describe(self):
+        base_description = super().describe()
+        return base_description + self.hazard_description + "\n"
+
 class Player(Character):
     def __init__(self, name, current_location, hp=20, attack_power=5):
         super().__init__(name, hp, attack_power)
@@ -189,7 +206,25 @@ def load_world_from_data(game_data):
 
     all_locations = {}
     for loc_id, loc_data in game_data.get("locations", {}).items():
-        all_locations[loc_id] = Location(loc_data["name"], loc_data["description"])
+        loc_type = loc_data.get("location_type", "base")
+        if loc_type == "City":
+            all_locations[loc_id] = CityLocation(
+                loc_data["name"], loc_data["description"]
+            )
+        elif loc_type == "Wilderness":
+            all_locations[loc_id] = WildernessLocation(
+                loc_data["name"], loc_data["description"],
+                spawn_chance=loc_data.get("spawn_chance", 0.0)
+            )
+        elif loc_type == "Dungeon":
+            all_locations[loc_id] = DungeonLocation(
+                loc_data["name"], loc_data["description"],
+                hazard_description=loc_data.get("hazard_description", "")
+            )
+        else:
+            all_locations[loc_id] = Location(
+                loc_data["name"], loc_data["description"]
+            )
 
     # --- Linking Pass ---
     for loc_id, loc_data in game_data.get("locations", {}).items():
