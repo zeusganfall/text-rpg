@@ -222,8 +222,8 @@ def get_available_actions(player, game_mode, menus):
                 if "condition" in definition:
                     if definition["condition"] == "is_potion" and not isinstance(it, Potion):
                         continue
-            if definition["condition"] == "is_usable_in_combat" and not isinstance(it, (Potion, OffensiveItem)):
-                continue
+                    if definition["condition"] == "is_usable_in_combat" and not isinstance(it, (Potion, OffensiveItem)):
+                        continue
 
                 action = definition.copy()
                 if iterator_key == "location.exits":
@@ -329,7 +329,7 @@ def load_world_from_data(game_data):
         location.monsters = []
         for monster_id in loc_data.get("monster_ids", []):
             proto_monster = all_monsters[monster_id]
-            new_monster = copy.copy(proto_monster)
+            new_monster = copy.deepcopy(proto_monster)
 
             instance_count = monster_instance_counter.get(monster_id, 0)
             new_monster.id = f"{monster_id}:{instance_count}"
