@@ -271,7 +271,12 @@ def load_world_from_data(game_data):
 
     all_npcs = {}
     for npc_id, npc_data in game_data.get("npcs", {}).items():
-        all_npcs[npc_id] = NPC(npc_data["name"], npc_data["dialogue"], npc_data["hp"], npc_data["attack_power"])
+        if "dialogue" not in npc_data:
+            print(f"WARNING: NPC '{npc_data.get('name', 'Unnamed')}' (ID: {npc_id}) is missing a 'dialogue' field in game_data.json.")
+            dialogue = ""
+        else:
+            dialogue = npc_data["dialogue"]
+        all_npcs[npc_id] = NPC(npc_data["name"], dialogue, npc_data["hp"], npc_data["attack_power"])
 
     all_locations = {}
     for loc_id, loc_data in game_data.get("locations", {}).items():
@@ -391,6 +396,16 @@ def main():
                     message = "You don't see that here."
             elif verb == "inventory":
                 message = "You are carrying:\n" + "\n".join(f"- {item.name}" for item in player.inventory) if player.inventory else "Your inventory is empty."
+            elif verb == "talk":
+                target_name = " ".join(parts[1:]).strip("'")
+                npc = next((n for n in player.current_location.npcs if n.name.lower() == target_name.lower()), None)
+                if npc:
+                    if npc.dialogue:
+                        message = f'**{npc.name} says:** "{npc.dialogue}"'
+                    else:
+                        message = f"{npc.name} has nothing to say."
+                else:
+                    message = "There is no one here by that name."
             elif verb == "use":
                 item = next((i for i in player.inventory if i.name.lower() == " ".join(parts[1:]).strip("'").lower()), None)
                 if item:
