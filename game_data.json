@@ -32,9 +32,28 @@
       "description": "A dark and damp cave, home to a clan of mischievous goblins.",
       "hazard_description": "A foul stench hangs in the air.",
       "exits": { "west": "whispering_woods" },
+      "conditional_exits": [
+        {
+          "direction": "east",
+          "destination_id": "hidden_shrine",
+          "description": "A faint shimmering in the eastern wall hints at a hidden passage.",
+          "conditions": [
+            { "type": "has_item", "item_id": "amulet_of_seeing_1" }
+          ]
+        }
+      ],
       "npc_ids": [],
       "monster_ids": [],
       "item_ids": ["fireproof_armor_1"]
+    },
+    "hidden_shrine": {
+      "location_type": "Dungeon",
+      "name": "Hidden Shrine",
+      "description": "A small, circular chamber made of polished white stone. Intricate carvings cover the walls, depicting celestial scenes. A single pedestal stands in the center.",
+      "exits": { "west": "goblin_cave" },
+      "npc_ids": [],
+      "monster_ids": [],
+      "item_ids": ["ancient_tome_1"]
     },
     "ashen_peaks": {
       "location_type": "Volcanic",
@@ -86,7 +105,7 @@
       "monster_type": "Beast",
       "hp": 20,
       "attack_power": 6,
-      "drop_ids": ["rusted_sword_1"]
+      "drop_ids": ["amulet_of_seeing_1"]
     },
     "fire_elemental_1": {
       "name": "Fire Elemental",
@@ -169,6 +188,18 @@
       "value": 75,
       "effect": "fire_resistance",
       "duration": 5
+    },
+    "amulet_of_seeing_1": {
+      "item_type": "Item",
+      "name": "Amulet of Seeing",
+      "description": "A strange amulet that hums with a faint energy. It seems to reveal things that are hidden.",
+      "value": 200
+    },
+    "ancient_tome_1": {
+      "item_type": "Item",
+      "name": "Ancient Tome",
+      "description": "A heavy book filled with cryptic writings about the world's creation.",
+      "value": 300
     }
   },
   "menus": {
@@ -188,5 +219,6 @@
     "always": [
       { "text": "Quit game", "command": "quit" }
     ]
-  }
+  },
+  "quests": {}
 }
