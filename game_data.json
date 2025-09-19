@@ -4,7 +4,7 @@
     "hp": 20,
     "attack_power": 5,
     "start_location_id": "oakhaven",
-    "inventory": []
+    "inventory": ["magic_scroll_1"]
   },
   "locations": {
     "oakhaven": {
@@ -21,7 +21,7 @@
       "name": "Whispering Woods",
       "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
       "spawn_chance": 0.5,
-      "exits": { "south": "oakhaven", "east": "goblin_cave" },
+      "exits": { "south": "oakhaven", "east": "sunken_swamp" },
       "npc_ids": [],
       "monster_ids": ["goblin_1"],
       "item_ids": []
@@ -35,6 +35,17 @@
       "npc_ids": [],
       "monster_ids": [],
       "item_ids": []
+    },
+    "sunken_swamp": {
+      "location_type": "Swamp",
+      "name": "The Sunken Swamp",
+      "description": "Ancient, moss-covered ruins jut out from murky water. A testament to a long-forgotten civilization that thrived here before the land was flooded. The air is thick with the smell of decay.",
+      "hidden_description": "A thick, cloying fog hangs heavy in the air, obscuring the details of this murky swamp. It's too dark to see clearly. You'll need a light source to explore properly.",
+      "spawn_chance": 0.7,
+      "exits": { "west": "whispering_woods" },
+      "npc_ids": [],
+      "monster_ids": ["bog_lurker_1", "swamp_serpent_1"],
+      "item_ids": ["waterlogged_chest_1"]
     }
   },
   "npcs": {
@@ -51,7 +62,21 @@
       "monster_type": "Goblin",
       "hp": 10,
       "attack_power": 3,
-      "drop_ids": ["healing_potion_1"]
+      "drop_ids": ["lantern_1"]
+    },
+    "bog_lurker_1": {
+      "name": "Bog Lurker",
+      "monster_type": "Beast",
+      "hp": 15,
+      "attack_power": 4,
+      "drop_ids": ["moldy_potion_1"]
+    },
+    "swamp_serpent_1": {
+      "name": "Swamp Serpent",
+      "monster_type": "Beast",
+      "hp": 20,
+      "attack_power": 6,
+      "drop_ids": ["rusted_sword_1"]
     }
   },
   "items": {
@@ -61,23 +86,54 @@
       "description": "A simple potion that restores 10 health.",
       "value": 5,
       "heal_amount": 10
+    },
+    "moldy_potion_1": {
+      "item_type": "Potion",
+      "name": "Moldy Potion",
+      "description": "A foul-smelling potion. Restores 5 health.",
+      "value": 1,
+      "heal_amount": 5
+    },
+    "lantern_1": {
+      "item_type": "Item",
+      "name": "Lantern",
+      "description": "An old lantern that casts a steady light.",
+      "value": 10
+    },
+    "rusted_sword_1": {
+      "item_type": "Item",
+      "name": "Rusted Sword",
+      "description": "A worthless, rusted sword.",
+      "value": 1
+    },
+    "waterlogged_chest_1": {
+      "item_type": "Container",
+      "name": "Waterlogged Chest",
+      "description": "A heavy, waterlogged chest. It seems to be unlocked.",
+      "value": 0,
+      "contained_item_ids": ["rusted_sword_1"]
+    },
+    "magic_scroll_1": {
+      "item_type": "OffensiveItem",
+      "name": "Magic Scroll",
+      "description": "A scroll that unleashes a bolt of energy.",
+      "value": 25,
+      "damage_amount": 10
     }
   },
   "menus": {
     "explore": [
       { "text": "Look around", "command": "look" },
       { "text": "View inventory", "command": "inventory" },
-      { "text": "Go {direction}", "command": "go {direction}", "iterate": "location.exits" },
-      { "text": "Talk to {npc.name}", "command": "talk to '{npc.name}'", "iterate": "location.npcs" },
-      { "text": "Get {item.name}", "command": "get '{item.name}'", "iterate": "location.items" },
-      { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" }
-    ],
-    "encounter": [
-      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" },
-      { "text": "Retreat", "command": "retreat" }
+      { "text": "Go {direction} -> {destination.name}", "command": "go {direction}", "iterate": "location.exits" },
+      { "text": "Talk to {npc.name}", "command": "talk {npc.id}", "iterate": "location.npcs" },
+      { "text": "Get {item.name}", "command": "get {item.id}", "iterate": "location.items" },
+      { "text": "Use {item.name}", "command": "use {item.id}", "iterate": "player.inventory", "condition": "is_potion" }
     ],
     "combat": [
-      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" }
+      { "text": "Attack {monster.name} (HP: {monster.hp}/{monster.max_hp})", "command": "attack {monster.id}", "iterate": "location.monsters" },
+      { "text": "Use {item.name}", "command": "use {item.id}", "iterate": "player.inventory", "condition": "is_usable_in_combat" },
+      { "text": "Retreat from combat", "command": "retreat" }
     ],
     "always": [
       { "text": "Quit game", "command": "quit" }
