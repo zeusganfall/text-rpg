@@ -104,28 +104,63 @@ def display_menu_and_state(player, message, actions):
         print(f"  {i + 1}. {action['text']}")
     print("-" * 40)
 
-def get_available_actions(player, game_mode):
-    """Generates a list of available actions for the player."""
+def get_available_actions(player, game_mode, menus):
+    """Generates a list of available actions for the player based on JSON menu definitions."""
     actions = []
-    if game_mode == "explore":
-        actions.append({'text': 'Look around', 'command': 'look'})
-        actions.append({'text': 'View inventory', 'command': 'inventory'})
-        for direction in player.current_location.exits:
-            actions.append({'text': f'Go {direction}', 'command': f'go {direction}'})
-        for npc in player.current_location.npcs:
-            actions.append({'text': f"Talk to {npc.name}", 'command': f"talk to '{npc.name}'"})
-        for item in player.current_location.items:
-            actions.append({'text': f"Get {item.name}", 'command': f"get '{item.name}'"})
-        for item in player.inventory:
-            if isinstance(item, Potion):
-                actions.append({'text': f"Use {item.name}", 'command': f"use '{item.name}'"})
-    elif game_mode == "encounter":
-        actions.append({'text': 'Attack', 'command': 'attack'})
-        actions.append({'text': 'Retreat', 'command': 'retreat'})
-    elif game_mode == "combat":
-        actions.append({'text': 'Attack', 'command': 'attack'})
+    menu_definitions = menus.get(game_mode, []) + menus.get("always", [])
 
-    actions.append({'text': 'Quit game', 'command': 'quit'})
+    for definition in menu_definitions:
+        # Simple action, no conditions or iterations
+        if "iterate" not in definition and "condition" not in definition:
+            actions.append(definition.copy())
+            continue
+
+        # Check condition for non-iterated actions
+        if "condition" in definition and "iterate" not in definition:
+            if definition["condition"] == "player.inventory" and not player.inventory:
+                continue
+            actions.append(definition.copy())
+
+        # Handle iterated actions
+        if "iterate" in definition:
+            iterator_key = definition["iterate"]
+            source_list = []
+            if iterator_key == "location.exits":
+                source_list = player.current_location.exits.items()
+            elif iterator_key == "location.npcs":
+                source_list = player.current_location.npcs
+            elif iterator_key == "location.items":
+                source_list = player.current_location.items
+            elif iterator_key == "player.inventory":
+                source_list = player.inventory
+            elif iterator_key == "location.monsters":
+                source_list = player.current_location.monsters
+
+            for it in source_list:
+                # Check condition for iterated actions
+                if "condition" in definition:
+                    if definition["condition"] == "is_potion" and not isinstance(it, Potion):
+                        continue
+
+                action = definition.copy()
+                if iterator_key == "location.exits":
+                    direction, dest = it
+                    action['text'] = definition["text"].format(direction=direction)
+                    action['command'] = definition["command"].format(direction=direction)
+                elif iterator_key == "location.npcs":
+                    action['text'] = definition["text"].format(npc=it)
+                    action['command'] = definition["command"].format(npc=it)
+                elif iterator_key == "location.items":
+                    action['text'] = definition["text"].format(item=it)
+                    action['command'] = definition["command"].format(item=it)
+                elif iterator_key == "player.inventory":
+                    action['text'] = definition["text"].format(item=it)
+                    action['command'] = definition["command"].format(item=it)
+                elif iterator_key == "location.monsters":
+                    action['text'] = definition["text"].format(monster=it)
+                    action['command'] = definition["command"].format(monster=it)
+
+                actions.append(action)
     return actions
 
 def load_game_data(filepath):
@@ -133,30 +168,61 @@ def load_game_data(filepath):
     with open(filepath, 'r') as f:
         return json.load(f)
 
+def load_world_from_data(game_data):
+    """Creates all game objects from the normalized data and links them."""
+    all_items = {}
+    for item_id, item_data in game_data.get("items", {}).items():
+        if item_data.get("item_type") == "Potion":
+            all_items[item_id] = Potion(item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("heal_amount", 0))
+        else:
+            all_items[item_id] = Item(item_data["name"], item_data["description"], item_data.get("value", 0))
+
+    all_monsters = {}
+    for monster_id, monster_data in game_data.get("monsters", {}).items():
+        all_monsters[monster_id] = Monster(
+            monster_data["name"], monster_data["monster_type"], monster_data["hp"], monster_data["attack_power"]
+        )
+
+    all_npcs = {}
+    for npc_id, npc_data in game_data.get("npcs", {}).items():
+        all_npcs[npc_id] = NPC(npc_data["name"], npc_data["dialogue"], npc_data["hp"], npc_data["attack_power"])
+
+    all_locations = {}
+    for loc_id, loc_data in game_data.get("locations", {}).items():
+        all_locations[loc_id] = Location(loc_data["name"], loc_data["description"])
+
+    # --- Linking Pass ---
+    for loc_id, loc_data in game_data.get("locations", {}).items():
+        location = all_locations[loc_id]
+        location.exits = {direction: all_locations[dest_id] for direction, dest_id in loc_data.get("exits", {}).items()}
+        location.npcs = [all_npcs[npc_id] for npc_id in loc_data.get("npc_ids", [])]
+        location.monsters = [all_monsters[monster_id] for monster_id in loc_data.get("monster_ids", [])]
+        location.items = [all_items[item_id] for item_id in loc_data.get("item_ids", [])]
+
+    for monster_id, monster_data in game_data.get("monsters", {}).items():
+        monster = all_monsters[monster_id]
+        monster.drops = [all_items[item_id] for item_id in monster_data.get("drop_ids", [])]
+
+    # --- Player Creation ---
+    player_data = game_data["player"]
+    start_location = all_locations[player_data["start_location_id"]]
+    inventory = [all_items[item_id] for item_id in player_data.get("inventory", [])]
+    player = Player(
+        player_data["name"], start_location, player_data["hp"], player_data["attack_power"]
+    )
+    player.inventory = inventory
+
+    return player, game_data.get("menus", {})
+
 def main():
     game_data = load_game_data("game_data.json")
-
-    # Create location objects
-    locations = {}
-    for loc_id, loc_data in game_data["locations"].items():
-        npc_objects = [NPC(npc["name"], npc["dialogue"]) for npc in loc_data.get("npcs", [])]
-        monster_objects = [Monster(m["name"], m["monster_type"], m["hp"], m["attack_power"], drops=m.get("drops", [])) for m in loc_data.get("monsters", [])]
-        locations[loc_id] = Location(loc_data["name"], loc_data["description"], npcs=npc_objects, monsters=monster_objects)
-
-    # Link locations
-    for loc_id, loc_data in game_data["locations"].items():
-        location = locations[loc_id]
-        for direction, dest_id in loc_data["exits"].items():
-            location.exits[direction] = locations[dest_id]
-
-    # Initialize Player and Game State
-    player = Player("Hero", locations[game_data["start_location"]])
+    player, menus = load_world_from_data(game_data)
     game_mode = "explore"
     message = player.current_location.describe()
 
     # Main Game Loop
     while player.is_alive():
-        available_actions = get_available_actions(player, game_mode)
+        available_actions = get_available_actions(player, game_mode, menus)
         display_menu_and_state(player, message, available_actions)
 
         # Get player's choice
@@ -229,11 +295,9 @@ def main():
             else:
                 combat_message += f"\nYou have defeated the {monster.name}!"
                 if monster.drops:
-                    for drop_data in monster.drops:
-                        if drop_data["item_type"] == "Potion":
-                            item = Potion(drop_data["name"], drop_data["description"], drop_data["value"], drop_data["heal_amount"])
-                            player.current_location.items.append(item)
-                            combat_message += f"\nThe {monster.name} dropped a {item.name}!"
+                    for item in monster.drops:
+                        player.current_location.items.append(item)
+                        combat_message += f"\nThe {monster.name} dropped a {item.name}!"
                 player.current_location.monsters.remove(monster)
                 game_mode = "explore"
             message = combat_message
