@@ -767,7 +767,17 @@ def main():
                                 player.current_location.items.append(item)
                                 items_dropped_this_monster.append(item.name)
                             if items_dropped_this_monster:
-                                message += f" It dropped a {', '.join(items_dropped_this_monster)}."
+                                loot_message = " It dropped "
+                                if "Amulet of Seeing" in items_dropped_this_monster:
+                                    loot_message += "the Amulet of Seeing."
+                                else:
+                                    # A simple heuristic for "a" vs "an"
+                                    article = "an" if items_dropped_this_monster[0].lower().startswith(('a', 'e', 'i', 'o', 'u')) else "a"
+                                    if len(items_dropped_this_monster) == 1:
+                                        loot_message += f"{article} {items_dropped_this_monster[0]}."
+                                    else:
+                                        loot_message += f": {', '.join(items_dropped_this_monster)}."
+                                message += loot_message
 
                         # Handle sequential spawning
                         monster_proto_id = m.id.split(':')[0]

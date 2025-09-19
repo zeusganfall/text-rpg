@@ -124,8 +124,7 @@
       "name": "Bog Lurker",
       "monster_type": "Beast",
       "hp": 15,
-      "attack_power": 4,
-      "drop_ids": ["moldy_potion_1", "herbal_remedy_1"]
+      "attack_power": 4
     },
     "swamp_serpent_1": {
       "name": "Swamp Serpent",
