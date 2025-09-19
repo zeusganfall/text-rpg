@@ -4,7 +4,7 @@
     "hp": 20,
     "attack_power": 5,
     "start_location_id": "oakhaven",
-    "inventory": []
+    "inventory": ["magic_scroll_1"]
   },
   "locations": {
     "oakhaven": {
@@ -112,6 +112,13 @@
       "description": "A heavy, waterlogged chest. It seems to be unlocked.",
       "value": 0,
       "contained_item_ids": ["rusted_sword_1"]
+    },
+    "magic_scroll_1": {
+      "item_type": "OffensiveItem",
+      "name": "Magic Scroll",
+      "description": "A scroll that unleashes a bolt of energy.",
+      "value": 25,
+      "damage_amount": 10
     }
   },
   "menus": {
@@ -128,8 +135,8 @@
       { "text": "Retreat", "command": "retreat" }
     ],
     "combat": [
-      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" },
-      { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" },
+      { "text": "Attack an enemy", "command": "attack" },
+      { "text": "Use an item", "command": "use", "condition": "has_usable_item" },
       { "text": "Retreat from combat", "command": "retreat" }
     ],
     "always": [
