@@ -19,7 +19,7 @@
     "whispering_woods": {
       "location_type": "Wilderness",
       "name": "Whispering Woods",
-      "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
+      "description": "A dense forest where the trees seem to whisper secrets. Claw marks on the trees point westward. An old traveler's warning echoes in your mind: 'Beware the Ashen Peaks. Without protection, the fire will scorch you alive.'",
       "spawn_chance": 0.5,
       "exits": { "south": "oakhaven", "east": "sunken_swamp", "north": "ashen_peaks", "west": "goblin_cave" },
       "npc_ids": [],
@@ -29,12 +29,12 @@
     "goblin_cave": {
       "location_type": "Dungeon",
       "name": "Goblin Cave",
-      "description": "A dark and damp cave, home to a clan of mischievous goblins.",
+      "description": "The Goblin Cave is damp and dark. To the east, a faint shimmer glows along the wall...",
       "hazard_description": "A foul stench hangs in the air.",
       "exits": { "east": "whispering_woods" },
       "conditional_exits": [
         {
-          "direction": "east",
+          "direction": "northeast",
           "destination_id": "hidden_shrine",
           "description": "A faint shimmering in the eastern wall hints at a hidden passage.",
           "conditions": [
@@ -43,7 +43,7 @@
         }
       ],
       "npc_ids": [],
-      "monster_ids": [],
+      "monster_ids": ["goblin_chief_1"],
       "item_ids": ["fireproof_armor_1"]
     },
     "hidden_shrine": {
@@ -68,7 +68,7 @@
     "sunken_swamp": {
       "location_type": "Swamp",
       "name": "The Sunken Swamp",
-      "description": "Ancient, moss-covered ruins jut out from murky water. A testament to a long-forgotten civilization that thrived here before the land was flooded. The air is thick with the smell of decay.",
+      "description": "Ancient, moss-covered ruins jut out from murky water, a testament to a long-forgotten civilization. The air is thick with the smell of decay, and you get the feeling that something massive stirs beneath the water...",
       "hidden_description": "A thick, cloying fog hangs heavy in the air, obscuring the details of this murky swamp. It's too dark to see clearly. You'll need a light source to explore properly.",
       "spawn_chance": 0.7,
       "exits": { "west": "whispering_woods" },
@@ -80,7 +80,21 @@
   "npcs": {
     "old_man_willow": {
       "name": "Old Man Willow",
-      "dialogue": "Hmph. The world isn't as quiet as it used to be.",
+      "dialogue": [
+        {
+          "conditions": [{ "type": "quest_completed", "quest_id": "quest_cleared_swamp" }],
+          "text": "The swamp grows quieter… thanks to you."
+        },
+        {
+          "conditions": [{ "type": "has_item", "item_id": "lantern_1" }],
+          "text": "Ah, I see you carry the lantern. May it light your path."
+        },
+        {
+          "conditions": [],
+          "text": "Hmph. The world isn't as quiet as it used to be. The darkness spreads. A guiding light is needed."
+        }
+      ],
+      "gives_items_on_talk": ["lantern_1"],
       "hp": 10,
       "attack_power": 0
     }
@@ -91,21 +105,29 @@
       "monster_type": "Goblin",
       "hp": 10,
       "attack_power": 3,
-      "drop_ids": ["lantern_1"]
+      "drop_ids": ["rusty_trinket_1"]
+    },
+    "goblin_chief_1": {
+      "name": "Goblin Chief",
+      "monster_type": "Goblin",
+      "hp": 18,
+      "attack_power": 5,
+      "drop_ids": ["healing_potion_1"]
     },
     "bog_lurker_1": {
       "name": "Bog Lurker",
       "monster_type": "Beast",
       "hp": 15,
       "attack_power": 4,
-      "drop_ids": ["moldy_potion_1"]
+      "drop_ids": ["moldy_potion_1", "herbal_remedy_1"]
     },
     "swamp_serpent_1": {
       "name": "Swamp Serpent",
       "monster_type": "Beast",
       "hp": 20,
       "attack_power": 6,
-      "drop_ids": ["amulet_of_seeing_1"]
+      "drop_ids": ["amulet_of_seeing_1"],
+      "completes_quest_id": "quest_cleared_swamp"
     },
     "fire_elemental_1": {
       "name": "Fire Elemental",
@@ -129,6 +151,19 @@
       "description": "A simple potion that restores 10 health.",
       "value": 5,
       "heal_amount": 10
+    },
+    "herbal_remedy_1": {
+      "item_type": "Potion",
+      "name": "Herbal Remedy",
+      "description": "A pungent herbal remedy that restores a small amount of health.",
+      "value": 8,
+      "heal_amount": 7
+    },
+    "rusty_trinket_1": {
+      "item_type": "Item",
+      "name": "Rusty Trinket",
+      "description": "A small, oddly shaped piece of rusted metal. It might be valuable to someone.",
+      "value": 3
     },
     "moldy_potion_1": {
       "item_type": "Potion",
@@ -221,5 +256,11 @@
       { "text": "Quit game", "command": "quit" }
     ]
   },
-  "quests": {}
+  "quests": {
+    "quest_cleared_swamp": {
+      "name": "Clear the Sunken Swamp",
+      "description": "The Sunken Swamp is overrun with dangerous creatures. Clear them out.",
+      "state": "not_started"
+    }
+  }
 }

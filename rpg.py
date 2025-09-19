@@ -11,15 +11,17 @@ class Character:
         return self.hp > 0
 
 class NPC(Character):
-    def __init__(self, id, name, dialogue, hp=0, attack_power=0, inventory=None):
+    def __init__(self, id, name, dialogue, hp=0, attack_power=0, inventory=None, gives_items_on_talk=None):
         super().__init__(id, name, hp, attack_power, inventory)
         self.dialogue = dialogue
+        self.gives_items_on_talk = gives_items_on_talk if gives_items_on_talk is not None else []
 
 class Monster(Character):
-    def __init__(self, id, name, monster_type, hp, attack_power, drops=None):
+    def __init__(self, id, name, monster_type, hp, attack_power, drops=None, completes_quest_id=None):
         super().__init__(id, name, hp, attack_power)
         self.monster_type = monster_type
         self.drops = drops if drops is not None else []
+        self.completes_quest_id = completes_quest_id
 
 class Item:
     def __init__(self, id, name, description, value=0):
@@ -175,7 +177,8 @@ class Player(Character):
                 if not any(item.id == condition['item_id'] for item in self.inventory):
                     return False
             elif condition['type'] == 'quest_completed':
-                if self.quests.get(condition['quest_id']) != 'completed':
+                # Check the 'state' of the quest
+                if self.quests.get(condition['quest_id'], {}).get('state') != 'completed':
                     return False
             # Add other condition types here in the future
         return True
@@ -330,17 +333,18 @@ def load_world_from_data(game_data):
     all_monsters = {}
     for monster_id, monster_data in game_data.get("monsters", {}).items():
         all_monsters[monster_id] = Monster(
-            monster_id, monster_data["name"], monster_data["monster_type"], monster_data["hp"], monster_data["attack_power"]
+            monster_id, monster_data["name"], monster_data["monster_type"],
+            monster_data["hp"], monster_data["attack_power"],
+            completes_quest_id=monster_data.get("completes_quest_id")
         )
 
     all_npcs = {}
     for npc_id, npc_data in game_data.get("npcs", {}).items():
-        if "dialogue" not in npc_data:
-            print(f"WARNING: NPC '{npc_data.get('name', 'Unnamed')}' (ID: {npc_id}) is missing a 'dialogue' field in game_data.json.")
-            dialogue = ""
-        else:
-            dialogue = npc_data["dialogue"]
-        all_npcs[npc_id] = NPC(npc_id, npc_data["name"], dialogue, npc_data["hp"], npc_data["attack_power"])
+        all_npcs[npc_id] = NPC(
+            npc_id, npc_data["name"], npc_data.get("dialogue", ""),
+            npc_data["hp"], npc_data["attack_power"],
+            gives_items_on_talk=npc_data.get("gives_items_on_talk")
+        )
 
     all_locations = {}
     for loc_id, loc_data in game_data.get("locations", {}).items():
@@ -391,7 +395,7 @@ def load_world_from_data(game_data):
     for loc_id, loc_data in game_data.get("locations", {}).items():
         location = all_locations[loc_id]
         location.exits = {direction: all_locations[dest_id] for direction, dest_id in loc_data.get("exits", {}).items()}
-        location.npcs = [all_npcs[npc_id] for npc_id in loc_data.get("npc_ids", [])]
+        location.npcs = [copy.deepcopy(all_npcs[npc_id]) for npc_id in loc_data.get("npc_ids", [])]
 
         location.monsters = []
         for monster_id in loc_data.get("monster_ids", []):
@@ -429,7 +433,7 @@ def load_world_from_data(game_data):
     player.quests = player_data.get("quests", {})
     player.discovered_locations.add(start_location.id)
 
-    return player, game_data.get("menus", {}), all_locations
+    return player, game_data.get("menus", {}), all_locations, all_items
 
 class AsciiMap:
     def __init__(self, all_locations, player):
@@ -568,10 +572,9 @@ class AsciiMap:
 
 def main():
     game_data = load_game_data("game_data.json")
-    player, menus, all_locations = load_world_from_data(game_data)
+    player, menus, all_locations, all_items = load_world_from_data(game_data)
     game_mode = "explore"
     message = player.current_location.describe(player)
-    combat_loot = []
 
     while player.is_alive():
         # --- State Transition Check ---
@@ -579,7 +582,6 @@ def main():
             game_mode = "combat"
             monster_names = " and a ".join(m.name for m in player.current_location.monsters)
             message = f"You step into the {player.current_location.name}... {monster_names} block(s) your way!"
-            combat_loot = [] # Initialize loot for the upcoming battle
 
         # --- UI and Input ---
         available_actions = get_available_actions(player, game_mode, menus)
@@ -636,12 +638,37 @@ def main():
                 npc_id = parts[1]
                 npc = next((n for n in player.current_location.npcs if n.id == npc_id), None)
                 if npc:
-                    if npc.dialogue:
-                        message = f'**{npc.name} says:** "{npc.dialogue}"'
+                    # First, handle item giving
+                    if npc.gives_items_on_talk:
+                        given_items = []
+                        for item_id_to_give in npc.gives_items_on_talk:
+                            if not any(p_item.id == item_id_to_give for p_item in player.inventory):
+                                item_proto = all_items.get(item_id_to_give)
+                                if item_proto:
+                                    player.inventory.append(copy.deepcopy(item_proto))
+                                    given_items.append(item_proto.name)
+                        if given_items:
+                            message += f"You received: {', '.join(given_items)}!\n"
+                        npc.gives_items_on_talk = [] # Clear after giving
+
+                    # Then, handle dialogue
+                    dialogue_text = ""
+                    if isinstance(npc.dialogue, list):
+                        for dialogue_entry in npc.dialogue:
+                            if player.check_conditions(dialogue_entry.get('conditions', [])):
+                                dialogue_text = dialogue_entry["text"]
+                                break
+                        else:
+                            dialogue_text = f"{npc.name} has nothing to say to you right now."
+                    elif isinstance(npc.dialogue, str):
+                        dialogue_text = npc.dialogue
                     else:
-                        message = f"{npc.name} has nothing to say."
+                        dialogue_text = f"{npc.name} has nothing to say."
+
+                    message += f'**{npc.name} says:** "{dialogue_text}"'
                 else:
                     message = "There is no one here by that name."
+
             elif verb == "use":
                 item_id = parts[1]
                 item = next((i for i in player.inventory if i.id == item_id), None)
@@ -712,23 +739,39 @@ def main():
 
             # --- Post-Action Resolution ---
             if player_turn_taken:
-                # Check for defeated monsters
                 defeated_monsters = [m for m in active_monsters if not m.is_alive()]
                 if defeated_monsters:
+                    unique_item_ids = {'lantern_1', 'amulet_of_seeing_1'}
                     for m in defeated_monsters:
                         message += f"\nYou have defeated the {m.name}!"
+
+                        # Check for quest completion
+                        if m.completes_quest_id and m.completes_quest_id in player.quests:
+                            player.quests[m.completes_quest_id]['state'] = 'completed'
+                            message += f"\n  Quest Completed: {player.quests[m.completes_quest_id]['name']}!"
+
+                        # Handle loot drops
                         if m.drops:
-                            combat_loot.extend(m.drops)
+                            items_dropped_this_monster = []
+                            for item in m.drops:
+                                is_unique = item.id in unique_item_ids
+                                has_in_inventory = any(i.id == item.id for i in player.inventory)
+                                on_ground_here = any(i.id == item.id for i in player.current_location.items)
+
+                                if is_unique and (has_in_inventory or on_ground_here):
+                                    continue
+
+                                player.current_location.items.append(item)
+                                items_dropped_this_monster.append(item.name)
+
+                            if items_dropped_this_monster:
+                                message += f"\n- It dropped: {', '.join(items_dropped_this_monster)}!"
+
                     player.current_location.monsters = [m for m in active_monsters if m.is_alive()]
 
-                # Check for victory
                 if not player.current_location.monsters:
-                    message = f"Victory! You have defeated all enemies in the {player.current_location.name}."
-                    if combat_loot:
-                        message += "\nYou found:\n" + "\n".join(f"- {item.name}" for item in combat_loot)
-                        player.current_location.items.extend(combat_loot)
+                    message += f"\n\nVictory! You have defeated all enemies in the {player.current_location.name}."
                     game_mode = "explore"
-                # Enemy turn
                 elif game_mode == "combat":
                     enemy_turn_message = ""
                     for monster in player.current_location.monsters:
@@ -736,9 +779,7 @@ def main():
                         enemy_turn_message += f"\nThe {monster.name} attacks you, dealing {monster.attack_power} damage."
                     message += enemy_turn_message
 
-            # --- Environmental Effects and Status Effect Cooldown ---
             if player_turn_taken and player.is_alive():
-                # Handle Volcanic Damage
                 if isinstance(player.current_location, VolcanicLocation):
                     has_fire_armor = any(item.name == "Fireproof Armor" for item in player.inventory)
                     has_fire_resistance = 'fire_resistance' in player.status_effects
@@ -748,7 +789,6 @@ def main():
                         player.hp -= fire_damage
                         message += f"\nThe searing heat of the volcano burns you for {fire_damage} damage!"
 
-                # Cooldown status effects
                 effects_to_remove = []
                 if player.status_effects:
                     for effect, duration in player.status_effects.items():
