@@ -68,13 +68,19 @@
     "sunken_swamp": {
       "location_type": "Swamp",
       "name": "The Sunken Swamp",
-      "description": "Ancient, moss-covered ruins jut out from murky water, a testament to a long-forgotten civilization. The air is thick with the smell of decay, and you get the feeling that something massive stirs beneath the water...",
+      "description": "Ancient, moss-covered ruins jut out from murky water, a testament to a long-forgotten civilization. The air is thick with the smell of decay.",
       "hidden_description": "A thick, cloying fog hangs heavy in the air, obscuring the details of this murky swamp. It's too dark to see clearly. You'll need a light source to explore properly.",
       "spawn_chance": 0.7,
       "exits": { "west": "whispering_woods" },
       "npc_ids": [],
-      "monster_ids": ["bog_lurker_1", "swamp_serpent_1"],
-      "item_ids": ["waterlogged_chest_1"]
+      "monster_ids": ["bog_lurker_1"],
+      "item_ids": ["waterlogged_chest_1"],
+      "spawns_on_defeat": {
+        "bog_lurker_1": {
+          "monster_id_to_spawn": "swamp_serpent_1",
+          "message": "The waters churn violently... the Swamp Serpent emerges!"
+        }
+      }
     }
   },
   "npcs": {
@@ -94,7 +100,7 @@
           "text": "Hmph. The world isn't as quiet as it used to be. The darkness spreads. A guiding light is needed."
         }
       ],
-      "gives_items_on_talk": ["lantern_1", "healing_potion_1"],
+      "gives_items_on_talk": ["lantern_1", "healing_potion_1", "healing_potion_2"],
       "hp": 10,
       "attack_power": 0
     }
@@ -112,7 +118,7 @@
       "monster_type": "Goblin",
       "hp": 18,
       "attack_power": 5,
-      "drop_ids": ["healing_potion_1"]
+      "drop_ids": ["healing_potion_3"]
     },
     "bog_lurker_1": {
       "name": "Bog Lurker",
@@ -146,6 +152,20 @@
   },
   "items": {
     "healing_potion_1": {
+      "item_type": "Potion",
+      "name": "Healing Potion",
+      "description": "A simple potion that restores 10 health.",
+      "value": 5,
+      "heal_amount": 10
+    },
+    "healing_potion_2": {
+      "item_type": "Potion",
+      "name": "Healing Potion",
+      "description": "A simple potion that restores 10 health.",
+      "value": 5,
+      "heal_amount": 10
+    },
+    "healing_potion_3": {
       "item_type": "Potion",
       "name": "Healing Potion",
       "description": "A simple potion that restores 10 health.",

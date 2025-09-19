@@ -80,7 +80,7 @@ class Container(Item):
         return message
 
 class Location:
-    def __init__(self, id, name, description, exits=None, npcs=None, monsters=None, items=None):
+    def __init__(self, id, name, description, exits=None, npcs=None, monsters=None, items=None, spawns_on_defeat=None):
         self.id = id
         self.name = name
         self.description = description
@@ -89,6 +89,7 @@ class Location:
         self.monsters = monsters if monsters is not None else []
         self.items = items if items is not None else []
         self.conditional_exits = []
+        self.spawns_on_defeat = spawns_on_defeat if spawns_on_defeat is not None else {}
 
     def describe(self, player):
         description = f"**{self.name}**\n"
@@ -349,35 +350,38 @@ def load_world_from_data(game_data):
     all_locations = {}
     for loc_id, loc_data in game_data.get("locations", {}).items():
         loc_type = loc_data.get("location_type", "base")
+        # A bit of repetition here, but it's clear
+        common_args = {
+            "id": loc_id,
+            "name": loc_data["name"],
+            "description": loc_data["description"],
+            "spawns_on_defeat": loc_data.get("spawns_on_defeat")
+        }
         if loc_type == "City":
-            all_locations[loc_id] = CityLocation(
-                loc_id, loc_data["name"], loc_data["description"]
-            )
+            all_locations[loc_id] = CityLocation(**common_args)
         elif loc_type == "Wilderness":
             all_locations[loc_id] = WildernessLocation(
-                loc_id, loc_data["name"], loc_data["description"],
+                **common_args,
                 spawn_chance=loc_data.get("spawn_chance", 0.0)
             )
         elif loc_type == "Dungeon":
             all_locations[loc_id] = DungeonLocation(
-                loc_id, loc_data["name"], loc_data["description"],
+                **common_args,
                 hazard_description=loc_data.get("hazard_description", "")
             )
         elif loc_type == "Swamp":
             all_locations[loc_id] = SwampLocation(
-                loc_id, loc_data["name"], loc_data["description"],
+                **common_args,
                 spawn_chance=loc_data.get("spawn_chance", 0.0),
                 hidden_description=loc_data.get("hidden_description", "")
             )
         elif loc_type == "Volcanic":
             all_locations[loc_id] = VolcanicLocation(
-                loc_id, loc_data["name"], loc_data["description"],
+                **common_args,
                 spawn_chance=loc_data.get("spawn_chance", 0.0)
             )
         else:
-            all_locations[loc_id] = Location(
-                loc_id, loc_data["name"], loc_data["description"]
-            )
+            all_locations[loc_id] = Location(**common_args)
 
     # --- Linking Pass ---
     # Link monster drops and container items first
@@ -747,8 +751,9 @@ def main():
 
                         # Check for quest completion
                         if m.completes_quest_id and m.completes_quest_id in player.quests:
-                            player.quests[m.completes_quest_id]['state'] = 'completed'
-                            message += f"\n  Quest Completed: {player.quests[m.completes_quest_id]['name']}!"
+                            if player.quests[m.completes_quest_id].get('state') != 'completed':
+                                player.quests[m.completes_quest_id]['state'] = 'completed'
+                                message += f"\n  Quest Completed: {player.quests[m.completes_quest_id]['name']}!"
 
                         # Handle loot drops
                         if m.drops:
@@ -757,15 +762,29 @@ def main():
                                 is_unique = item.id in unique_item_ids
                                 has_in_inventory = any(i.id == item.id for i in player.inventory)
                                 on_ground_here = any(i.id == item.id for i in player.current_location.items)
-
                                 if is_unique and (has_in_inventory or on_ground_here):
                                     continue
-
                                 player.current_location.items.append(item)
                                 items_dropped_this_monster.append(item.name)
-
                             if items_dropped_this_monster:
                                 message += f" It dropped a {', '.join(items_dropped_this_monster)}."
+
+                        # Handle sequential spawning
+                        monster_proto_id = m.id.split(':')[0]
+                        if monster_proto_id in player.current_location.spawns_on_defeat:
+                            spawn_data = player.current_location.spawns_on_defeat[monster_proto_id]
+                            monster_to_spawn_id = spawn_data["monster_id_to_spawn"]
+
+                            new_monster_proto = all_monsters.get(monster_to_spawn_id)
+                            if new_monster_proto:
+                                new_monster = copy.deepcopy(new_monster_proto)
+                                # Find a unique instance ID
+                                instance_count = sum(1 for mon in player.current_location.monsters if mon.id.startswith(monster_to_spawn_id))
+                                new_monster.id = f"{monster_to_spawn_id}:{instance_count}"
+
+                                player.current_location.monsters.append(new_monster)
+                                message += f'\n{spawn_data["message"]}'
+
 
                     player.current_location.monsters = [m for m in active_monsters if m.is_alive()]
 
