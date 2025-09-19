@@ -8,6 +8,7 @@
   },
   "locations": {
     "oakhaven": {
+      "location_type": "City",
       "name": "Oakhaven",
       "description": "A peaceful village nestled in a clearing. The smell of fresh bread fills the air.",
       "exits": { "north": "whispering_woods" },
@@ -16,16 +17,20 @@
       "item_ids": []
     },
     "whispering_woods": {
+      "location_type": "Wilderness",
       "name": "Whispering Woods",
       "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
+      "spawn_chance": 0.5,
       "exits": { "south": "oakhaven", "east": "goblin_cave" },
       "npc_ids": [],
       "monster_ids": ["goblin_1"],
       "item_ids": []
     },
     "goblin_cave": {
+      "location_type": "Dungeon",
       "name": "Goblin Cave",
       "description": "A dark and damp cave, home to a clan of mischievous goblins.",
+      "hazard_description": "A foul stench hangs in the air.",
       "exits": { "west": "whispering_woods" },
       "npc_ids": [],
       "monster_ids": [],
