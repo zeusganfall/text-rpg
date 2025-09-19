@@ -141,20 +141,27 @@ class Player(Character):
         self.previous_location = current_location
         self.status_effects = {}
         self.quests = {}
+        self.discovered_locations = set()
 
     def move(self, direction):
+        moved = False
         if direction in self.current_location.exits:
             self.previous_location = self.current_location
             self.current_location = self.current_location.exits[direction]
-            return True
+            moved = True
+        else:
+            # Check conditional exits
+            for c_exit in self.current_location.conditional_exits:
+                if c_exit.direction == direction:
+                    if self.check_conditions(c_exit.conditions):
+                        self.previous_location = self.current_location
+                        self.current_location = c_exit.destination
+                        moved = True
+                        break
 
-        # Check conditional exits
-        for c_exit in self.current_location.conditional_exits:
-            if c_exit.direction == direction:
-                if self.check_conditions(c_exit.conditions):
-                    self.previous_location = self.current_location
-                    self.current_location = c_exit.destination
-                    return True
+        if moved:
+            self.discovered_locations.add(self.current_location.id)
+            return True
 
         return False
 
@@ -420,12 +427,148 @@ def load_world_from_data(game_data):
     )
     player.inventory = inventory
     player.quests = player_data.get("quests", {})
+    player.discovered_locations.add(start_location.id)
 
-    return player, game_data.get("menus", {})
+    return player, game_data.get("menus", {}), all_locations
+
+class AsciiMap:
+    def __init__(self, all_locations, player):
+        self.all_locations = all_locations
+        self.player = player
+        self.accessible_graph = {}
+        self.coords = {}
+
+    def generate(self):
+        self._build_accessible_graph()
+        if not self.accessible_graph:
+            return "You are lost in an unknown place."
+
+        self._assign_coordinates()
+        visible_ids = self._get_visible_locations()
+        return self._render_map(visible_ids)
+
+    def _build_accessible_graph(self):
+        start_id = self.player.current_location.id
+        q = collections.deque([start_id])
+        visited = {start_id}
+
+        while q:
+            current_id = q.popleft()
+            if current_id not in self.all_locations: continue
+            location = self.all_locations[current_id]
+            self.accessible_graph[current_id] = {}
+
+            exits = dict(location.exits.items())
+            for c_exit in location.conditional_exits:
+                if self.player.check_conditions(c_exit.conditions):
+                    exits[c_exit.direction] = c_exit.destination
+
+            for direction, dest_loc in exits.items():
+                self.accessible_graph[current_id][direction] = dest_loc.id
+                if dest_loc.id not in visited:
+                    visited.add(dest_loc.id)
+                    q.append(dest_loc.id)
+
+    def _assign_coordinates(self):
+        start_id = self.player.current_location.id
+        q = collections.deque([start_id])
+        self.coords = {start_id: (0, 0)}
+
+        while q:
+            current_id = q.popleft()
+            cx, cy = self.coords[current_id]
+
+            exits = self.accessible_graph.get(current_id, {})
+            for direction, neighbor_id in exits.items():
+                if neighbor_id in self.coords:
+                    continue
+
+                dx, dy = 0, 0
+                if direction == 'north': dy = -1
+                elif direction == 'south': dy = 1
+                elif direction == 'east':  dx = 1
+                elif direction == 'west':  dx = -1
+                else: continue
+
+                nx, ny = cx + dx, cy + dy
+
+                while (nx, ny) in self.coords.values():
+                    nx += 1 # Simple collision avoidance
+
+                self.coords[neighbor_id] = (nx, ny)
+                q.append(neighbor_id)
+
+    def _get_visible_locations(self):
+        visible = set(self.player.discovered_locations)
+        for loc_id in list(self.player.discovered_locations):
+            if loc_id in self.accessible_graph:
+                for neighbor_id in self.accessible_graph[loc_id].values():
+                    visible.add(neighbor_id)
+        return visible
+
+    def _render_map(self, visible_ids):
+        if not self.coords: return "Map is empty."
+
+        visible_coords = {loc_id: pos for loc_id, pos in self.coords.items() if loc_id in visible_ids}
+        if not visible_coords: return "You haven't discovered enough to draw a map."
+
+        min_x = min(x for x, y in visible_coords.values())
+        min_y = min(y for x, y in visible_coords.values())
+        norm_coords = {loc_id: (x - min_x, y - min_y) for loc_id, (x, y) in visible_coords.items()}
+
+        max_x = max(x for x, y in norm_coords.values()) if norm_coords else 0
+        max_y = max(y for x, y in norm_coords.values()) if norm_coords else 0
+
+        grid = [[None for _ in range(max_x + 1)] for _ in range(max_y + 1)]
+        for loc_id, (x, y) in norm_coords.items():
+            grid[y][x] = loc_id
+
+        max_width = len("[ ??? ]")
+        for loc_id in visible_ids:
+            if loc_id in self.player.discovered_locations:
+                name = self.all_locations[loc_id].name
+                max_width = max(max_width, len(name) + 4)
+
+        output_lines = []
+        for y, row in enumerate(grid):
+            node_line = ""
+            conn_line = ""
+            for x, loc_id in enumerate(row):
+                if loc_id is None:
+                    node_line += " " * (max_width + 3)
+                    conn_line += " " * (max_width + 3)
+                    continue
+
+                if loc_id in self.player.discovered_locations:
+                    loc = self.all_locations[loc_id]
+                    name = f"*{loc.name}*" if loc.id == self.player.current_location.id else loc.name
+                    node_str = f"[{name}]"
+                else:
+                    node_str = "[ ??? ]"
+                node_line += node_str.center(max_width)
+
+                exits = self.accessible_graph.get(loc_id, {})
+                east_neighbor = exits.get('east')
+                if east_neighbor and east_neighbor in visible_ids and east_neighbor in norm_coords and norm_coords[east_neighbor][0] > x:
+                    node_line += "---"
+                else:
+                    node_line += "   "
+
+                south_neighbor = exits.get('south')
+                if south_neighbor and south_neighbor in visible_ids and south_neighbor in norm_coords and norm_coords[south_neighbor][1] > y:
+                    conn_line += "|".center(max_width) + "   "
+                else:
+                    conn_line += " " * (max_width + 3)
+
+            output_lines.append(node_line.rstrip())
+            if conn_line.strip():
+                output_lines.append(conn_line.rstrip())
+
+        return "\n".join(output_lines)
 
 def main():
     game_data = load_game_data("game_data.json")
-    player, menus = load_world_from_data(game_data)
+    player, menus, all_locations = load_world_from_data(game_data)
     game_mode = "explore"
     message = player.current_location.describe(player)
     combat_loot = []
@@ -468,6 +611,10 @@ def main():
             player_turn_taken = True # Most explore actions take a "turn"
             if verb == "look":
                 message = player.current_location.describe(player)
+            elif verb == "map":
+                mapper = AsciiMap(all_locations, player)
+                message = mapper.generate()
+                player_turn_taken = False # Viewing the map shouldn't take a turn
             elif verb == "go":
                 direction = parts[1]
                 if player.move(direction):
