@@ -14,9 +14,28 @@ class NPC(Character):
         self.dialogue = dialogue
 
 class Monster(Character):
-    def __init__(self, name, monster_type, hp, attack_power):
+    def __init__(self, name, monster_type, hp, attack_power, drops=None):
         super().__init__(name, hp, attack_power)
         self.monster_type = monster_type
+        self.drops = drops if drops is not None else []
+
+class Item:
+    def __init__(self, name, description, value=0):
+        self.name = name
+        self.description = description
+        self.value = value
+
+    def use(self, target):
+        return f"You can't use {self.name}."
+
+class Potion(Item):
+    def __init__(self, name, description, value, heal_amount):
+        super().__init__(name, description, value)
+        self.heal_amount = heal_amount
+
+    def use(self, target):
+        target.hp += self.heal_amount
+        return f"{target.name} uses the {self.name} and heals for {self.heal_amount} HP."
 
 class Location:
     def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None):
@@ -34,6 +53,8 @@ class Location:
             description += "You see: " + ", ".join(npc.name for npc in self.npcs) + "\n"
         if self.monsters:
             description += "DANGER: " + ", ".join(monster.name for monster in self.monsters) + " is here!\n"
+        if self.items:
+            description += "On the ground: " + ", ".join(item.name for item in self.items) + "\n"
         return description
 
 class Player(Character):
@@ -73,11 +94,16 @@ def display_game_state(player, message):
 
     # Command Menu
     print("-" * 40)
-    commands = "[look] "
+    commands = "[look] [inventory] "
     for direction in player.current_location.exits:
         commands += f"[go {direction}] "
     for npc in player.current_location.npcs:
         commands += f"[talk to '{npc.name}'] "
+    for item in player.current_location.items:
+        commands += f"[get '{item.name}'] "
+    for item in player.inventory:
+        if isinstance(item, Potion):
+            commands += f"[use '{item.name}'] "
     print(commands)
     print("-" * 40)
 
@@ -120,7 +146,11 @@ def main():
         if "monsters" in loc_data:
             for m_data in loc_data["monsters"]:
                 monster_objects.append(Monster(
-                    m_data["name"], m_data["monster_type"], m_data["hp"], m_data["attack_power"]
+                    m_data["name"],
+                    m_data["monster_type"],
+                    m_data["hp"],
+                    m_data["attack_power"],
+                    drops=m_data.get("drops", [])
                 ))
 
         locations[loc_id] = Location(
@@ -191,6 +221,44 @@ def main():
                         message = "There is no one here by that name."
                 else:
                     message = "Talk to whom?"
+            elif verb == "get":
+                if len(parts) > 1:
+                    item_name = " ".join(parts[1:])
+                    item_to_get = None
+                    for item in player.current_location.items:
+                        if item.name.lower() == item_name.lower():
+                            item_to_get = item
+                            break
+                    if item_to_get:
+                        player.inventory.append(item_to_get)
+                        player.current_location.items.remove(item_to_get)
+                        message = f"You pick up the {item_to_get.name}."
+                    else:
+                        message = "You don't see that here."
+                else:
+                    message = "Get what?"
+            elif verb == "inventory":
+                if player.inventory:
+                    inventory_list = "\n".join(f"- {item.name}: {item.description}" for item in player.inventory)
+                    message = f"You are carrying:\n{inventory_list}"
+                else:
+                    message = "Your inventory is empty."
+            elif verb == "use":
+                if len(parts) > 1:
+                    item_name = " ".join(parts[1:])
+                    item_to_use = None
+                    for item in player.inventory:
+                        if item.name.lower() == item_name.lower():
+                            item_to_use = item
+                            break
+                    if item_to_use:
+                        message = item_to_use.use(player)
+                        if isinstance(item_to_use, Potion):
+                            player.inventory.remove(item_to_use)
+                    else:
+                        message = "You don't have that item."
+                else:
+                    message = "Use what?"
             else:
                 message = "Unknown command."
 
@@ -208,6 +276,21 @@ def main():
                 else:
                     # Monster is defeated
                     combat_message += f"\nYou have defeated the {monster.name}!"
+
+                    # Handle loot drops
+                    if monster.drops:
+                        for drop_data in monster.drops:
+                            # This is a simple factory. Could be expanded.
+                            if drop_data["item_type"] == "Potion":
+                                item = Potion(
+                                    drop_data["name"],
+                                    drop_data["description"],
+                                    drop_data["value"],
+                                    drop_data["heal_amount"]
+                                )
+                                player.current_location.items.append(item)
+                                combat_message += f"\nThe {monster.name} dropped a {item.name}!"
+
                     player.current_location.monsters.remove(monster)
                     game_mode = "explore"
 

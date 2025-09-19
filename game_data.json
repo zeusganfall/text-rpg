@@ -25,7 +25,16 @@
           "name": "Goblin",
           "monster_type": "Goblin",
           "hp": 10,
-          "attack_power": 3
+          "attack_power": 3,
+          "drops": [
+            {
+              "item_type": "Potion",
+              "name": "Healing Potion",
+              "description": "A simple potion that restores 10 health.",
+              "value": 5,
+              "heal_amount": 10
+            }
+          ]
         }
       ]
     },
