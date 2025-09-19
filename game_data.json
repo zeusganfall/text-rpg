@@ -21,7 +21,7 @@
       "name": "Whispering Woods",
       "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
       "spawn_chance": 0.5,
-      "exits": { "south": "oakhaven", "east": "sunken_swamp", "north": "ashen_peaks" },
+      "exits": { "south": "oakhaven", "east": "sunken_swamp", "north": "ashen_peaks", "west": "goblin_cave" },
       "npc_ids": [],
       "monster_ids": ["goblin_1"],
       "item_ids": []
@@ -31,7 +31,7 @@
       "name": "Goblin Cave",
       "description": "A dark and damp cave, home to a clan of mischievous goblins.",
       "hazard_description": "A foul stench hangs in the air.",
-      "exits": { "west": "whispering_woods" },
+      "exits": { "east": "whispering_woods" },
       "conditional_exits": [
         {
           "direction": "east",
