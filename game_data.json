@@ -94,7 +94,7 @@
           "text": "Hmph. The world isn't as quiet as it used to be. The darkness spreads. A guiding light is needed."
         }
       ],
-      "gives_items_on_talk": ["lantern_1"],
+      "gives_items_on_talk": ["lantern_1", "healing_potion_1"],
       "hp": 10,
       "attack_power": 0
     }
@@ -124,8 +124,8 @@
     "swamp_serpent_1": {
       "name": "Swamp Serpent",
       "monster_type": "Beast",
-      "hp": 20,
-      "attack_power": 6,
+      "hp": 15,
+      "attack_power": 5,
       "drop_ids": ["amulet_of_seeing_1"],
       "completes_quest_id": "quest_cleared_swamp"
     },

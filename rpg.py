@@ -765,7 +765,7 @@ def main():
                                 items_dropped_this_monster.append(item.name)
 
                             if items_dropped_this_monster:
-                                message += f"\n- It dropped: {', '.join(items_dropped_this_monster)}!"
+                                message += f" It dropped a {', '.join(items_dropped_this_monster)}."
 
                     player.current_location.monsters = [m for m in active_monsters if m.is_alive()]
 
