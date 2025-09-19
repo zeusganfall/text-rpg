@@ -37,6 +37,23 @@ class Potion(Item):
         target.hp += self.heal_amount
         return f"{target.name} uses the {self.name} and heals for {self.heal_amount} HP."
 
+class Container(Item):
+    def __init__(self, name, description, value, contained_items=None):
+        super().__init__(name, description, value)
+        self.contained_items = contained_items if contained_items is not None else []
+
+    def use(self, target_player):
+        if not self.contained_items:
+            return f"You open the {self.name}, but it's empty."
+
+        message = f"You open the {self.name} and find:\n"
+        for item in self.contained_items:
+            target_player.inventory.append(item)
+            message += f"- {item.name}\n"
+
+        self.contained_items = []
+        return message
+
 class Location:
     def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None):
         self.name = name
@@ -46,7 +63,7 @@ class Location:
         self.monsters = monsters if monsters is not None else []
         self.items = items if items is not None else []
 
-    def describe(self):
+    def describe(self, player):
         description = f"**{self.name}**\n"
         description += f"{self.description}\n"
         if self.npcs:
@@ -70,9 +87,21 @@ class DungeonLocation(Location):
         super().__init__(name, description, exits, npcs, monsters, items)
         self.hazard_description = hazard_description
 
-    def describe(self):
-        base_description = super().describe()
+    def describe(self, player):
+        base_description = super().describe(player)
         return base_description + self.hazard_description + "\n"
+
+class SwampLocation(WildernessLocation):
+    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None, spawn_chance=0.0, hidden_description=""):
+        super().__init__(name, description, exits, npcs, monsters, items, spawn_chance)
+        self.hidden_description = hidden_description
+
+    def describe(self, player):
+        has_lantern = any(item.name == "Lantern" for item in player.inventory)
+        if has_lantern:
+            return super().describe(player)
+        else:
+            return self.hidden_description
 
 class Player(Character):
     def __init__(self, name, current_location, hp=20, attack_power=5):
@@ -189,8 +218,11 @@ def load_world_from_data(game_data):
     """Creates all game objects from the normalized data and links them."""
     all_items = {}
     for item_id, item_data in game_data.get("items", {}).items():
-        if item_data.get("item_type") == "Potion":
+        item_type = item_data.get("item_type", "Item")
+        if item_type == "Potion":
             all_items[item_id] = Potion(item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("heal_amount", 0))
+        elif item_type == "Container":
+            all_items[item_id] = Container(item_data["name"], item_data["description"], item_data.get("value", 0))
         else:
             all_items[item_id] = Item(item_data["name"], item_data["description"], item_data.get("value", 0))
 
@@ -221,6 +253,12 @@ def load_world_from_data(game_data):
                 loc_data["name"], loc_data["description"],
                 hazard_description=loc_data.get("hazard_description", "")
             )
+        elif loc_type == "Swamp":
+            all_locations[loc_id] = SwampLocation(
+                loc_data["name"], loc_data["description"],
+                spawn_chance=loc_data.get("spawn_chance", 0.0),
+                hidden_description=loc_data.get("hidden_description", "")
+            )
         else:
             all_locations[loc_id] = Location(
                 loc_data["name"], loc_data["description"]
@@ -238,6 +276,11 @@ def load_world_from_data(game_data):
         monster = all_monsters[monster_id]
         monster.drops = [all_items[item_id] for item_id in monster_data.get("drop_ids", [])]
 
+    for item_id, item_data in game_data.get("items", {}).items():
+        if item_data.get("item_type") == "Container":
+            container = all_items[item_id]
+            container.contained_items = [all_items[i_id] for i_id in item_data.get("contained_item_ids", [])]
+
     # --- Player Creation ---
     player_data = game_data["player"]
     start_location = all_locations[player_data["start_location_id"]]
@@ -253,7 +296,7 @@ def main():
     game_data = load_game_data("game_data.json")
     player, menus = load_world_from_data(game_data)
     game_mode = "explore"
-    message = player.current_location.describe()
+    message = player.current_location.describe(player)
 
     # Main Game Loop
     while player.is_alive():
@@ -281,7 +324,7 @@ def main():
             print("Thanks for playing!")
             break
         elif verb == "look":
-            message = player.current_location.describe()
+            message = player.current_location.describe(player)
         elif verb == "go":
             direction = parts[1]
             if player.move(direction):
@@ -289,7 +332,7 @@ def main():
                     game_mode = "encounter"
                     message = f"You go {direction}, but a wild {player.current_location.monsters[0].name} blocks your path!"
                 else:
-                    message = f"You go {direction}.\n\n{player.current_location.describe()}"
+                    message = f"You go {direction}.\n\n{player.current_location.describe(player)}"
             else:
                 message = "You can't go that way." # Should not happen with menu
         elif verb == "talk":
