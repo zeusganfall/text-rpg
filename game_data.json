@@ -45,7 +45,7 @@
       "exits": { "west": "whispering_woods" },
       "npc_ids": [],
       "monster_ids": ["bog_lurker_1", "swamp_serpent_1"],
-      "item_ids": ["waterlogged_chest_1", "lantern_1"]
+      "item_ids": ["waterlogged_chest_1"]
     }
   },
   "npcs": {
@@ -62,7 +62,7 @@
       "monster_type": "Goblin",
       "hp": 10,
       "attack_power": 3,
-      "drop_ids": ["healing_potion_1"]
+      "drop_ids": ["lantern_1"]
     },
     "bog_lurker_1": {
       "name": "Bog Lurker",
@@ -118,7 +118,7 @@
     "explore": [
       { "text": "Look around", "command": "look" },
       { "text": "View inventory", "command": "inventory" },
-      { "text": "Go {direction}", "command": "go {direction}", "iterate": "location.exits" },
+      { "text": "Go {direction} -> {destination.name}", "command": "go {direction}", "iterate": "location.exits" },
       { "text": "Talk to {npc.name}", "command": "talk to '{npc.name}'", "iterate": "location.npcs" },
       { "text": "Get {item.name}", "command": "get '{item.name}'", "iterate": "location.items" },
       { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" }
@@ -128,7 +128,9 @@
       { "text": "Retreat", "command": "retreat" }
     ],
     "combat": [
-      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" }
+      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" },
+      { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" },
+      { "text": "Retreat from combat", "command": "retreat" }
     ],
     "always": [
       { "text": "Quit game", "command": "quit" }

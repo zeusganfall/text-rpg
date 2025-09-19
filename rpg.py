@@ -123,6 +123,7 @@ class Player(Character):
 import os
 import platform
 import json
+import random
 
 def clear_screen():
     """Clears the console screen."""
@@ -191,7 +192,7 @@ def get_available_actions(player, game_mode, menus):
                 action = definition.copy()
                 if iterator_key == "location.exits":
                     direction, dest = it
-                    action['text'] = definition["text"].format(direction=direction)
+                    action['text'] = definition["text"].format(direction=direction, destination=dest)
                     action['command'] = definition["command"].format(direction=direction)
                 elif iterator_key == "location.npcs":
                     action['text'] = definition["text"].format(npc=it)
@@ -383,6 +384,18 @@ def main():
             if game_mode == "encounter":
                 player.retreat()
                 message = f"You retreat to {player.current_location.name}."
+                game_mode = "explore"
+            elif game_mode == "combat":
+                monster = player.current_location.monsters[0]
+                if random.random() < 0.5: # 50% chance for monster to attack
+                    player.hp -= monster.attack_power
+                    message = f"As you flee, the {monster.name} strikes you for {monster.attack_power} damage!"
+                    if not player.is_alive():
+                        continue # Let the main loop handle game over
+                else:
+                    message = "You successfully retreat!"
+
+                player.retreat()
                 game_mode = "explore"
         else:
             message = "Unknown action."
