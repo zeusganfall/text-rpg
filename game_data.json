@@ -19,7 +19,15 @@
       "exits": {
         "south": "oakhaven",
         "east": "goblin_cave"
-      }
+      },
+      "monsters": [
+        {
+          "name": "Goblin",
+          "monster_type": "Goblin",
+          "hp": 10,
+          "attack_power": 3
+        }
+      ]
     },
     "goblin_cave": {
       "name": "Goblin Cave",
