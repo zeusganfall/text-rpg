@@ -1,3 +1,15 @@
+class Character:
+    def __init__(self, name, hp=0, attack_power=0, inventory=None):
+        self.name = name
+        self.hp = hp
+        self.attack_power = attack_power
+        self.inventory = inventory if inventory is not None else []
+
+class NPC(Character):
+    def __init__(self, name, dialogue, hp=0, attack_power=0, inventory=None):
+        super().__init__(name, hp, attack_power, inventory)
+        self.dialogue = dialogue
+
 class Location:
     def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None):
         self.name = name
@@ -10,6 +22,8 @@ class Location:
     def describe(self):
         description = f"**{self.name}**\n"
         description += f"{self.description}\n"
+        if self.npcs:
+            description += "You see: " + ", ".join(npc.name for npc in self.npcs) + "\n"
         return description
 
 class Player:
@@ -52,6 +66,8 @@ def display_game_state(player, message):
     commands = "[look] "
     for direction in player.current_location.exits:
         commands += f"[go {direction}] "
+    for npc in player.current_location.npcs:
+        commands += f"[talk to '{npc.name}'] "
     print(commands)
     print("-" * 40)
 
@@ -66,7 +82,17 @@ def main():
     # Create location objects
     locations = {}
     for loc_id, loc_data in game_data["locations"].items():
-        locations[loc_id] = Location(loc_data["name"], loc_data["description"])
+        # Create NPC objects for the location
+        npc_objects = []
+        if "npcs" in loc_data:
+            for npc_data in loc_data["npcs"]:
+                npc_objects.append(NPC(npc_data["name"], npc_data["dialogue"]))
+
+        locations[loc_id] = Location(
+            loc_data["name"],
+            loc_data["description"],
+            npcs=npc_objects
+        )
 
     # Link locations
     for loc_id, loc_data in game_data["locations"].items():
@@ -100,6 +126,19 @@ def main():
                 message = player.move(direction)
             else:
                 message = "Go where?"
+        elif verb == "talk":
+            if len(parts) > 2 and parts[1] == "to":
+                target_name = " ".join(parts[2:]).strip("'")
+                found_npc = False
+                for npc in player.current_location.npcs:
+                    if npc.name.lower() == target_name.lower():
+                        message = f'**{npc.name} says:** "{npc.dialogue}"'
+                        found_npc = True
+                        break
+                if not found_npc:
+                    message = "There is no one here by that name."
+            else:
+                message = "Talk to whom?"
         else:
             message = "Unknown command."
 
