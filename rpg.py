@@ -109,13 +109,13 @@ class CityLocation(Location):
     pass
 
 class WildernessLocation(Location):
-    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None, spawn_chance=0.0):
-        super().__init__(name, description, exits, npcs, monsters, items)
+    def __init__(self, id, name, description, exits=None, npcs=None, monsters=None, items=None, spawns_on_defeat=None, spawn_chance=0.0):
+        super().__init__(id, name, description, exits, npcs, monsters, items, spawns_on_defeat)
         self.spawn_chance = spawn_chance
 
 class DungeonLocation(Location):
-    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None, hazard_description=""):
-        super().__init__(name, description, exits, npcs, monsters, items)
+    def __init__(self, id, name, description, exits=None, npcs=None, monsters=None, items=None, spawns_on_defeat=None, hazard_description=""):
+        super().__init__(id, name, description, exits, npcs, monsters, items, spawns_on_defeat)
         self.hazard_description = hazard_description
 
     def describe(self, player):
@@ -123,8 +123,8 @@ class DungeonLocation(Location):
         return base_description + self.hazard_description + "\n"
 
 class SwampLocation(WildernessLocation):
-    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None, spawn_chance=0.0, hidden_description=""):
-        super().__init__(name, description, exits, npcs, monsters, items, spawn_chance)
+    def __init__(self, id, name, description, exits=None, npcs=None, monsters=None, items=None, spawns_on_defeat=None, spawn_chance=0.0, hidden_description=""):
+        super().__init__(id, name, description, exits, npcs, monsters, items, spawns_on_defeat, spawn_chance)
         self.hidden_description = hidden_description
 
     def describe(self, player):
