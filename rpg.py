@@ -141,6 +141,26 @@ def clear_screen():
     else:
         os.system('clear')
 
+def select_from_menu(prompt, options, display_key='name'):
+    """Displays a numbered menu of options and returns the selected option or None."""
+    print(prompt)
+    for i, option in enumerate(options):
+        print(f"  {i + 1}. {getattr(option, display_key)}")
+    print(f"  {len(options) + 1}. Cancel")
+
+    while True:
+        choice = input("> ")
+        try:
+            choice_index = int(choice) - 1
+            if 0 <= choice_index < len(options):
+                return options[choice_index]
+            elif choice_index == len(options):
+                return None # Cancel
+            else:
+                print("Invalid choice. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+
 def display_menu_and_state(player, message, actions, game_mode):
     """Clears the screen, displays player status, a message, and a numbered action menu."""
     clear_screen()
@@ -316,10 +336,12 @@ def main():
     combat_loot = []
 
     while player.is_alive():
+        # --- State Transition Check ---
         if game_mode == "explore" and player.current_location.monsters:
             game_mode = "encounter"
-            message = f"You encounter hostiles!\n" + player.current_location.describe(player)
+            message = f"You encounter hostiles!\n\n" + player.current_location.describe(player)
 
+        # --- UI and Input ---
         available_actions = get_available_actions(player, game_mode, menus)
         display_menu_and_state(player, message, available_actions, game_mode)
 
@@ -337,53 +359,51 @@ def main():
         parts = command.split()
         verb = parts[0]
         message = "" # Reset message each turn
+        player_turn_taken = False
 
+        # --- Command Processing ---
         if verb == "quit":
             print("Thanks for playing!")
             break
 
         # --- EXPLORE MODE ---
         if game_mode == "explore":
+            player_turn_taken = True # Most explore actions take a "turn"
             if verb == "look":
                 message = player.current_location.describe(player)
             elif verb == "go":
                 direction = parts[1]
                 if player.move(direction):
-                    message = f"You go {direction}.\n\n{player.current_location.describe(player)}"
+                    message = f"You go {direction}."
                 else:
                     message = "You can't go that way."
-            # ... other explore commands
             elif verb == "get":
                 item_name = " ".join(parts[1:]).strip("'")
-                item_to_get = next((i for i in player.current_location.items if i.name.lower() == item_name.lower()), None)
-                if item_to_get:
-                    player.inventory.append(item_to_get)
-                    player.current_location.items.remove(item_to_get)
-                    message = f"You pick up the {item_to_get.name}."
+                item = next((i for i in player.current_location.items if i.name.lower() == item_name.lower()), None)
+                if item:
+                    player.inventory.append(item)
+                    player.current_location.items.remove(item)
+                    message = f"You pick up the {item.name}."
                 else:
                     message = "You don't see that here."
             elif verb == "inventory":
-                message = f"You are carrying:\n" + "\n".join(f"- {item.name}" for item in player.inventory) if player.inventory else "Your inventory is empty."
-            elif verb == "talk":
-                target_name = " ".join(parts[2:]).strip("'")
-                npc = next((n for n in player.current_location.npcs if n.name.lower() == target_name.lower()), None)
-                message = f'**{npc.name} says:** "{npc.dialogue}"' if npc else "There is no one here by that name."
+                message = "You are carrying:\n" + "\n".join(f"- {item.name}" for item in player.inventory) if player.inventory else "Your inventory is empty."
             elif verb == "use":
-                item_name = " ".join(parts[1:]).strip("'")
-                item_to_use = next((i for i in player.inventory if i.name.lower() == item_name.lower()), None)
-                if item_to_use:
-                    message = item_to_use.use(player)
-                    if isinstance(item_to_use, (Potion, Container)):
-                        player.inventory.remove(item_to_use)
+                item = next((i for i in player.inventory if i.name.lower() == " ".join(parts[1:]).strip("'").lower()), None)
+                if item:
+                    message = item.use(player)
+                    if isinstance(item, (Potion, Container)):
+                        player.inventory.remove(item)
                 else:
                     message = "You don't have that item."
 
         # --- ENCOUNTER MODE ---
         elif game_mode == "encounter":
+            player_turn_taken = True
             if verb == "attack":
                 game_mode = "combat"
                 combat_loot = []
-                message = "You enter combat!"
+                message = "You attack!"
             elif verb == "retreat":
                 player.retreat()
                 game_mode = "explore"
@@ -393,88 +413,79 @@ def main():
         elif game_mode == "combat":
             active_monsters = player.current_location.monsters
 
-            # Player action
-            player_action_message = ""
             if verb == "attack":
-                # Target selection
-                target_choice = input(f"Which enemy to attack? (1-{len(active_monsters)}): ")
-                try:
-                    target_index = int(target_choice) - 1
-                    if 0 <= target_index < len(active_monsters):
-                        target_monster = active_monsters[target_index]
-                        target_monster.hp -= player.attack_power
-                        player_action_message = f"You attack the {target_monster.name}, dealing {player.attack_power} damage."
-                    else:
-                        player_action_message = "Invalid target."
-                except ValueError:
-                    player_action_message = "Invalid target."
+                target = None
+                if len(active_monsters) == 1:
+                    target = active_monsters[0]
+                else:
+                    target = select_from_menu("\nWhich enemy to attack?", active_monsters)
+
+                if target:
+                    message = f"You attack the {target.name}, dealing {player.attack_power} damage."
+                    target.hp -= player.attack_power
+                    player_turn_taken = True
+                else:
+                    message = "You decided not to attack."
+
             elif verb == "use":
                 usable_items = [item for item in player.inventory if isinstance(item, (Potion, OffensiveItem))]
                 if not usable_items:
-                    player_action_message = "You have no usable items in combat."
+                    message = "You have no usable items in combat."
                 else:
-                    print("\nWhich item to use?")
-                    for i, item in enumerate(usable_items):
-                        print(f"  {i + 1}. {item.name}")
-                    item_choice = input("> ")
-                    try:
-                        item_index = int(item_choice) - 1
-                        if 0 <= item_index < len(usable_items):
-                            item_to_use = usable_items[item_index]
-                            if isinstance(item_to_use, Potion):
-                                player_action_message = item_to_use.use(player)
+                    item_to_use = select_from_menu("\nWhich item to use?", usable_items)
+                    if item_to_use:
+                        if isinstance(item_to_use, OffensiveItem):
+                            target = select_from_menu(f"\nUse {item_to_use.name} on which enemy?", active_monsters)
+                            if target:
+                                message = item_to_use.use(target)
                                 player.inventory.remove(item_to_use)
-                            elif isinstance(item_to_use, OffensiveItem):
-                                target_choice = input(f"Which enemy to target? (1-{len(active_monsters)}): ")
-                                target_index = int(target_choice) - 1
-                                if 0 <= target_index < len(active_monsters):
-                                    target_monster = active_monsters[target_index]
-                                    player_action_message = item_to_use.use(target_monster)
-                                    player.inventory.remove(item_to_use)
-                                else:
-                                    player_action_message = "Invalid target."
-                        else:
-                            player_action_message = "Invalid item choice."
-                    except (ValueError, IndexError):
-                        player_action_message = "Invalid item choice."
+                                player_turn_taken = True
+                            else:
+                                message = "You decided not to use the item."
+                        else: # Potion
+                            message = item_to_use.use(player)
+                            player.inventory.remove(item_to_use)
+                            player_turn_taken = True
+                    else:
+                        message = "You decided not to use an item."
 
             elif verb == "retreat":
-                player_action_message = "You flee from combat!"
+                message = "You flee from combat!"
                 for monster in active_monsters:
+                    message += f"\nThe {monster.name} gets a free hit, dealing {monster.attack_power} damage!"
                     player.hp -= monster.attack_power
-                    player_action_message += f"\nThe {monster.name} gets a free hit, dealing {monster.attack_power} damage!"
                 player.retreat()
                 game_mode = "explore"
+                player_turn_taken = True
 
-            # Check for defeated monsters after player action
-            defeated_monsters = []
-            for monster in active_monsters:
-                if not monster.is_alive():
-                    player_action_message += f"\nYou have defeated the {monster.name}!"
-                    if monster.drops:
-                        combat_loot.extend(monster.drops)
-                    defeated_monsters.append(monster)
+            # --- Post-Action Resolution ---
+            if player_turn_taken:
+                # Check for defeated monsters
+                defeated_monsters = [m for m in active_monsters if not m.is_alive()]
+                if defeated_monsters:
+                    for m in defeated_monsters:
+                        message += f"\nYou have defeated the {m.name}!"
+                        if m.drops:
+                            combat_loot.extend(m.drops)
+                    player.current_location.monsters = [m for m in active_monsters if m.is_alive()]
 
-            player.current_location.monsters = [m for m in active_monsters if m not in defeated_monsters]
-
-            # Enemy turn if combat is not over
-            enemy_action_message = ""
-            if game_mode == "combat" and player.current_location.monsters:
-                for monster in player.current_location.monsters:
-                    player.hp -= monster.attack_power
-                    enemy_action_message += f"\nThe {monster.name} attacks you, dealing {monster.attack_power} damage."
-
-            message = player_action_message + enemy_action_message
-
-            # Check for victory
-            if not player.current_location.monsters:
-                message += "\n\nAll enemies defeated!"
-                if combat_loot:
-                    message += "\nYou found:\n" + "\n".join(f"- {item.name}" for item in combat_loot)
-                    player.current_location.items.extend(combat_loot)
-                game_mode = "explore"
+                # Check for victory
+                if not player.current_location.monsters:
+                    message += "\n\nAll enemies defeated!"
+                    if combat_loot:
+                        message += "\nYou found:\n" + "\n".join(f"- {item.name}" for item in combat_loot)
+                        player.current_location.items.extend(combat_loot)
+                    game_mode = "explore"
+                # Enemy turn
+                elif game_mode == "combat":
+                    enemy_turn_message = ""
+                    for monster in player.current_location.monsters:
+                        player.hp -= monster.attack_power
+                        enemy_turn_message += f"\nThe {monster.name} attacks you, dealing {monster.attack_power} damage."
+                    message += enemy_turn_message
 
     if not player.is_alive():
+        print(f"\n{message}")
         print("\nYou have been defeated. Game Over.")
 
 if __name__ == "__main__":
