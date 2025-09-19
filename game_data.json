@@ -130,10 +130,6 @@
       { "text": "Get {item.name}", "command": "get '{item.name}'", "iterate": "location.items" },
       { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" }
     ],
-    "encounter": [
-      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" },
-      { "text": "Retreat", "command": "retreat" }
-    ],
     "combat": [
       { "text": "Attack an enemy", "command": "attack" },
       { "text": "Use an item", "command": "use", "condition": "has_usable_item" },

@@ -185,6 +185,7 @@ def display_menu_and_state(player, message, actions, game_mode):
 def get_available_actions(player, game_mode, menus):
     """Generates a list of available actions for the player based on JSON menu definitions."""
     actions = []
+    # The 'encounter' mode is removed, so we only check for 'explore' and 'combat'
     menu_definitions = menus.get(game_mode, []) + menus.get("always", [])
 
     for definition in menu_definitions:
@@ -338,8 +339,10 @@ def main():
     while player.is_alive():
         # --- State Transition Check ---
         if game_mode == "explore" and player.current_location.monsters:
-            game_mode = "encounter"
-            message = f"You encounter hostiles!\n\n" + player.current_location.describe(player)
+            game_mode = "combat"
+            monster_names = " and a ".join(m.name for m in player.current_location.monsters)
+            message = f"You step into the {player.current_location.name}... {monster_names} block(s) your way!"
+            combat_loot = [] # Initialize loot for the upcoming battle
 
         # --- UI and Input ---
         available_actions = get_available_actions(player, game_mode, menus)
@@ -397,18 +400,6 @@ def main():
                 else:
                     message = "You don't have that item."
 
-        # --- ENCOUNTER MODE ---
-        elif game_mode == "encounter":
-            player_turn_taken = True
-            if verb == "attack":
-                game_mode = "combat"
-                combat_loot = []
-                message = "You attack!"
-            elif verb == "retreat":
-                player.retreat()
-                game_mode = "explore"
-                message = f"You retreat to {player.current_location.name}."
-
         # --- COMBAT MODE ---
         elif game_mode == "combat":
             active_monsters = player.current_location.monsters
@@ -450,11 +441,24 @@ def main():
                         message = "You decided not to use an item."
 
             elif verb == "retreat":
-                message = "You flee from combat!"
-                for monster in active_monsters:
-                    message += f"\nThe {monster.name} gets a free hit, dealing {monster.attack_power} damage!"
-                    player.hp -= monster.attack_power
-                player.retreat()
+                retreat_message = "You flee from combat!"
+                monsters_left_behind = player.current_location.monsters[:]
+
+                for monster in monsters_left_behind:
+                    if random.random() < 0.5: # 50% chance
+                        player.hp -= monster.attack_power
+                        retreat_message += f"\nThe {monster.name} strikes you for {monster.attack_power} damage as you escape!"
+                    else:
+                        retreat_message += f"\nThe {monster.name} swipes at you but misses!"
+
+                if player.is_alive():
+                    # Create summary before moving
+                    threat_summary = f"The {player.current_location.name} still harbors danger: " + ", ".join(f"{m.name} ({m.hp} HP)" for m in monsters_left_behind)
+                    player.retreat()
+                    message = f"{retreat_message}\n\nYou escaped back to {player.current_location.name}.\n\n{threat_summary}"
+                else:
+                    message = retreat_message # Let the main loop handle death
+
                 game_mode = "explore"
                 player_turn_taken = True
 
@@ -471,7 +475,7 @@ def main():
 
                 # Check for victory
                 if not player.current_location.monsters:
-                    message += "\n\nAll enemies defeated!"
+                    message = f"Victory! You have defeated all enemies in the {player.current_location.name}."
                     if combat_loot:
                         message += "\nYou found:\n" + "\n".join(f"- {item.name}" for item in combat_loot)
                         player.current_location.items.extend(combat_loot)
