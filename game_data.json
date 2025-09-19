@@ -5,7 +5,13 @@
       "description": "A peaceful village nestled in a clearing. The smell of fresh bread fills the air.",
       "exits": {
         "north": "whispering_woods"
-      }
+      },
+      "npcs": [
+        {
+          "name": "Old Man Willow",
+          "dialogue": "Hmph. The world isn't as quiet as it used to be."
+        }
+      ]
     },
     "whispering_woods": {
       "name": "Whispering Woods",
