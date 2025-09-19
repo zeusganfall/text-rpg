@@ -1,0 +1,27 @@
+{
+  "locations": {
+    "oakhaven": {
+      "name": "Oakhaven",
+      "description": "A peaceful village nestled in a clearing. The smell of fresh bread fills the air.",
+      "exits": {
+        "north": "whispering_woods"
+      }
+    },
+    "whispering_woods": {
+      "name": "Whispering Woods",
+      "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
+      "exits": {
+        "south": "oakhaven",
+        "east": "goblin_cave"
+      }
+    },
+    "goblin_cave": {
+      "name": "Goblin Cave",
+      "description": "A dark and damp cave, home to a clan of mischievous goblins.",
+      "exits": {
+        "west": "whispering_woods"
+      }
+    }
+  },
+  "start_location": "oakhaven"
+}

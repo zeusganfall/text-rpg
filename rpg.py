@@ -26,29 +26,30 @@ class Player:
         else:
             print("You can't go that way.")
 
-def main():
-    # Locations
-    oakhaven = Location(
-        "Oakhaven",
-        "A peaceful village nestled in a clearing. The smell of fresh bread fills the air."
-    )
-    whispering_woods = Location(
-        "Whispering Woods",
-        "A dense forest where the trees seem to whisper secrets. It's easy to get lost here."
-    )
-    goblin_cave = Location(
-        "Goblin Cave",
-        "A dark and damp cave, home to a clan of mischievous goblins."
-    )
+import json
 
-    # Link Locations
-    oakhaven.exits["north"] = whispering_woods
-    whispering_woods.exits["south"] = oakhaven
-    whispering_woods.exits["east"] = goblin_cave
-    goblin_cave.exits["west"] = whispering_woods
+def load_game_data(filepath):
+    """Loads game data from a JSON file."""
+    with open(filepath, 'r') as f:
+        return json.load(f)
+
+def main():
+    game_data = load_game_data("game_data.json")
+
+    # Create location objects
+    locations = {}
+    for loc_id, loc_data in game_data["locations"].items():
+        locations[loc_id] = Location(loc_data["name"], loc_data["description"])
+
+    # Link locations
+    for loc_id, loc_data in game_data["locations"].items():
+        location = locations[loc_id]
+        for direction, dest_id in loc_data["exits"].items():
+            location.exits[direction] = locations[dest_id]
 
     # Player
-    player = Player("Hero", oakhaven)
+    start_location_id = game_data["start_location"]
+    player = Player("Hero", locations[start_location_id])
     player.current_location.describe()
 
     # Game Loop
