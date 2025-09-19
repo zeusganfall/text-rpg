@@ -40,6 +40,17 @@ class Potion(Item):
         target.hp += self.heal_amount
         return f"{target.name} uses the {self.name} and heals for {self.heal_amount} HP."
 
+class EffectPotion(Item):
+    def __init__(self, id, name, description, value, effect, duration):
+        super().__init__(id, name, description, value)
+        self.effect = effect
+        self.duration = duration
+
+    def use(self, target):
+        # Effects are dictionaries on the player, e.g. {'fire_resistance': 5}
+        target.status_effects[self.effect] = self.duration
+        return f"{target.name} uses the {self.name}. You feel a strange energy course through you."
+
 class OffensiveItem(Item):
     def __init__(self, id, name, description, value, damage_amount):
         super().__init__(id, name, description, value)
@@ -116,11 +127,15 @@ class SwampLocation(WildernessLocation):
         else:
             return self.hidden_description
 
+class VolcanicLocation(WildernessLocation):
+    pass
+
 class Player(Character):
     def __init__(self, id, name, current_location, hp=20, attack_power=5):
         super().__init__(id, name, hp, attack_power)
         self.current_location = current_location
         self.previous_location = current_location
+        self.status_effects = {}
 
     def move(self, direction):
         if direction in self.current_location.exits:
@@ -198,7 +213,7 @@ def get_available_actions(player, game_mode, menus):
         if "condition" in definition and "iterate" not in definition:
             if definition["condition"] == "player.inventory" and not player.inventory:
                 continue
-            if definition["condition"] == "has_usable_item" and not any(isinstance(item, (Potion, OffensiveItem)) for item in player.inventory):
+            if definition["condition"] == "has_usable_item" and not any(isinstance(item, (Potion, OffensiveItem, EffectPotion)) for item in player.inventory):
                 continue
             actions.append(definition.copy())
 
@@ -220,9 +235,9 @@ def get_available_actions(player, game_mode, menus):
             for it in source_list:
                 # Check condition for iterated actions
                 if "condition" in definition:
-                    if definition["condition"] == "is_potion" and not isinstance(it, Potion):
+                    if definition["condition"] == "is_potion" and not isinstance(it, (Potion, EffectPotion)):
                         continue
-                    if definition["condition"] == "is_usable_in_combat" and not isinstance(it, (Potion, OffensiveItem)):
+                    if definition["condition"] == "is_usable_in_combat" and not isinstance(it, (Potion, OffensiveItem, EffectPotion)):
                         continue
 
                 action = definition.copy()
@@ -258,6 +273,8 @@ def load_world_from_data(game_data):
         item_type = item_data.get("item_type", "Item")
         if item_type == "Potion":
             all_items[item_id] = Potion(item_id, item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("heal_amount", 0))
+        elif item_type == "EffectPotion":
+            all_items[item_id] = EffectPotion(item_id, item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("effect"), item_data.get("duration"))
         elif item_type == "Container":
             all_items[item_id] = Container(item_id, item_data["name"], item_data["description"], item_data.get("value", 0))
         elif item_type == "OffensiveItem":
@@ -302,6 +319,11 @@ def load_world_from_data(game_data):
                 loc_id, loc_data["name"], loc_data["description"],
                 spawn_chance=loc_data.get("spawn_chance", 0.0),
                 hidden_description=loc_data.get("hidden_description", "")
+            )
+        elif loc_type == "Volcanic":
+            all_locations[loc_id] = VolcanicLocation(
+                loc_id, loc_data["name"], loc_data["description"],
+                spawn_chance=loc_data.get("spawn_chance", 0.0)
             )
         else:
             all_locations[loc_id] = Location(
@@ -427,7 +449,7 @@ def main():
                 item = next((i for i in player.inventory if i.id == item_id), None)
                 if item:
                     message = item.use(player)
-                    if isinstance(item, (Potion, Container)):
+                    if isinstance(item, (Potion, Container, EffectPotion)):
                         player.inventory.remove(item)
                 else:
                     message = "You don't have that item."
@@ -459,7 +481,7 @@ def main():
                             player_turn_taken = True
                         else:
                             message = "You decided not to use the item."
-                    elif isinstance(item_to_use, Potion):
+                    elif isinstance(item_to_use, (Potion, EffectPotion)):
                         message = item_to_use.use(player)
                         player.inventory.remove(item_to_use)
                         player_turn_taken = True
@@ -515,6 +537,30 @@ def main():
                         player.hp -= monster.attack_power
                         enemy_turn_message += f"\nThe {monster.name} attacks you, dealing {monster.attack_power} damage."
                     message += enemy_turn_message
+
+            # --- Environmental Effects and Status Effect Cooldown ---
+            if player_turn_taken and player.is_alive():
+                # Handle Volcanic Damage
+                if isinstance(player.current_location, VolcanicLocation):
+                    has_fire_armor = any(item.name == "Fireproof Armor" for item in player.inventory)
+                    has_fire_resistance = 'fire_resistance' in player.status_effects
+
+                    if not has_fire_armor and not has_fire_resistance:
+                        fire_damage = 3
+                        player.hp -= fire_damage
+                        message += f"\nThe searing heat of the volcano burns you for {fire_damage} damage!"
+
+                # Cooldown status effects
+                effects_to_remove = []
+                if player.status_effects:
+                    for effect, duration in player.status_effects.items():
+                        player.status_effects[effect] -= 1
+                        if player.status_effects[effect] <= 0:
+                            effects_to_remove.append(effect)
+
+                    for effect in effects_to_remove:
+                        del player.status_effects[effect]
+                        message += f"\nThe effect of {effect.replace('_', ' ')} has worn off."
 
     if not player.is_alive():
         print(f"\n{message}")

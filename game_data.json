@@ -21,7 +21,7 @@
       "name": "Whispering Woods",
       "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
       "spawn_chance": 0.5,
-      "exits": { "south": "oakhaven", "east": "sunken_swamp" },
+      "exits": { "south": "oakhaven", "east": "sunken_swamp", "north": "ashen_peaks" },
       "npc_ids": [],
       "monster_ids": ["goblin_1"],
       "item_ids": []
@@ -34,6 +34,16 @@
       "exits": { "west": "whispering_woods" },
       "npc_ids": [],
       "monster_ids": [],
+      "item_ids": ["fireproof_armor_1"]
+    },
+    "ashen_peaks": {
+      "location_type": "Volcanic",
+      "name": "The Ashen Peaks",
+      "description": "A desolate landscape of black rock and rivers of magma. The air is thick with smoke and ash, and the ground is hot to the touch.",
+      "spawn_chance": 0.8,
+      "exits": { "south": "whispering_woods" },
+      "npc_ids": [],
+      "monster_ids": ["fire_elemental_1", "obsidian_golem_1"],
       "item_ids": []
     },
     "sunken_swamp": {
@@ -77,6 +87,20 @@
       "hp": 20,
       "attack_power": 6,
       "drop_ids": ["rusted_sword_1"]
+    },
+    "fire_elemental_1": {
+      "name": "Fire Elemental",
+      "monster_type": "Elemental",
+      "hp": 25,
+      "attack_power": 7,
+      "drop_ids": ["scorched_tablet_1"]
+    },
+    "obsidian_golem_1": {
+      "name": "Obsidian Golem",
+      "monster_type": "Construct",
+      "hp": 35,
+      "attack_power": 10,
+      "drop_ids": ["obsidian_fragment_1"]
     }
   },
   "items": {
@@ -119,6 +143,32 @@
       "description": "A scroll that unleashes a bolt of energy.",
       "value": 25,
       "damage_amount": 10
+    },
+    "scorched_tablet_1": {
+      "item_type": "Item",
+      "name": "Scorched Tablet",
+      "description": "A tablet covered in ancient, scorched carvings. It tells a fragment of the story of a civilization that worshipped the volcano.",
+      "value": 50
+    },
+    "obsidian_fragment_1": {
+      "item_type": "Item",
+      "name": "Obsidian Fragment",
+      "description": "A sharp, black volcanic glass shard.",
+      "value": 20
+    },
+    "fireproof_armor_1": {
+      "item_type": "Item",
+      "name": "Fireproof Armor",
+      "description": "A suit of armor made from strange, heat-resistant scales. It provides protection from extreme heat.",
+      "value": 150
+    },
+    "fire_resistance_potion_1": {
+      "item_type": "EffectPotion",
+      "name": "Fire Resistance Potion",
+      "description": "A potion that grants temporary resistance to fire.",
+      "value": 75,
+      "effect": "fire_resistance",
+      "duration": 5
     }
   },
   "menus": {
