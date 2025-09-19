@@ -61,13 +61,18 @@ class Player(Character):
     def __init__(self, name, current_location, hp=20, attack_power=5):
         super().__init__(name, hp, attack_power)
         self.current_location = current_location
+        self.previous_location = current_location
 
     def move(self, direction):
         if direction in self.current_location.exits:
+            self.previous_location = self.current_location
             self.current_location = self.current_location.exits[direction]
             return True
         else:
             return False
+
+    def retreat(self):
+        self.current_location = self.previous_location
 
 import os
 import platform
@@ -80,8 +85,8 @@ def clear_screen():
     else:
         os.system('clear')
 
-def display_game_state(player, message):
-    """Clears the screen and displays the game state in explore mode."""
+def display_menu_and_state(player, message, actions):
+    """Clears the screen, displays player status, a message, and a numbered action menu."""
     clear_screen()
 
     # Status Panel
@@ -89,40 +94,39 @@ def display_game_state(player, message):
     print(f"| Player: {player.name:<10} | HP: {player.hp:<3} | Location: {player.current_location.name:<10} |")
     print("=" * 40)
 
-    # Action Result
+    # Message
     print(f"\n{message}\n")
 
-    # Command Menu
+    # Action Menu
     print("-" * 40)
-    commands = "[look] [inventory] "
-    for direction in player.current_location.exits:
-        commands += f"[go {direction}] "
-    for npc in player.current_location.npcs:
-        commands += f"[talk to '{npc.name}'] "
-    for item in player.current_location.items:
-        commands += f"[get '{item.name}'] "
-    for item in player.inventory:
-        if isinstance(item, Potion):
-            commands += f"[use '{item.name}'] "
-    print(commands)
+    print("What do you do?")
+    for i, action in enumerate(actions):
+        print(f"  {i + 1}. {action['text']}")
     print("-" * 40)
 
-def display_combat_state(player, monster, message):
-    """Clears the screen and displays the combat state."""
-    clear_screen()
+def get_available_actions(player, game_mode):
+    """Generates a list of available actions for the player."""
+    actions = []
+    if game_mode == "explore":
+        actions.append({'text': 'Look around', 'command': 'look'})
+        actions.append({'text': 'View inventory', 'command': 'inventory'})
+        for direction in player.current_location.exits:
+            actions.append({'text': f'Go {direction}', 'command': f'go {direction}'})
+        for npc in player.current_location.npcs:
+            actions.append({'text': f"Talk to {npc.name}", 'command': f"talk to '{npc.name}'"})
+        for item in player.current_location.items:
+            actions.append({'text': f"Get {item.name}", 'command': f"get '{item.name}'"})
+        for item in player.inventory:
+            if isinstance(item, Potion):
+                actions.append({'text': f"Use {item.name}", 'command': f"use '{item.name}'"})
+    elif game_mode == "encounter":
+        actions.append({'text': 'Attack', 'command': 'attack'})
+        actions.append({'text': 'Retreat', 'command': 'retreat'})
+    elif game_mode == "combat":
+        actions.append({'text': 'Attack', 'command': 'attack'})
 
-    # Combat Status Panel
-    print("=" * 40)
-    print(f"| {player.name} HP: {player.hp:<4} | {monster.name} HP: {monster.hp:<4} |")
-    print("=" * 40)
-
-    # Action Result
-    print(f"\n{message}\n")
-
-    # Command Menu
-    print("-" * 40)
-    print("[attack]")
-    print("-" * 40)
+    actions.append({'text': 'Quit game', 'command': 'quit'})
+    return actions
 
 def load_game_data(filepath):
     """Loads game data from a JSON file."""
@@ -135,28 +139,9 @@ def main():
     # Create location objects
     locations = {}
     for loc_id, loc_data in game_data["locations"].items():
-        # Create NPC objects
-        npc_objects = []
-        if "npcs" in loc_data:
-            for npc_data in loc_data["npcs"]:
-                npc_objects.append(NPC(npc_data["name"], npc_data["dialogue"]))
-
-        # Create Monster objects
-        monster_objects = []
-        if "monsters" in loc_data:
-            for m_data in loc_data["monsters"]:
-                monster_objects.append(Monster(
-                    m_data["name"],
-                    m_data["monster_type"],
-                    m_data["hp"],
-                    m_data["attack_power"],
-                    drops=m_data.get("drops", [])
-                ))
-
-        locations[loc_id] = Location(
-            loc_data["name"], loc_data["description"],
-            npcs=npc_objects, monsters=monster_objects
-        )
+        npc_objects = [NPC(npc["name"], npc["dialogue"]) for npc in loc_data.get("npcs", [])]
+        monster_objects = [Monster(m["name"], m["monster_type"], m["hp"], m["attack_power"], drops=m.get("drops", [])) for m in loc_data.get("monsters", [])]
+        locations[loc_id] = Location(loc_data["name"], loc_data["description"], npcs=npc_objects, monsters=monster_objects)
 
     # Link locations
     for loc_id, loc_data in game_data["locations"].items():
@@ -171,134 +156,95 @@ def main():
 
     # Main Game Loop
     while player.is_alive():
-        # Display UI based on game mode
-        if game_mode == "explore":
-            display_game_state(player, message)
-        elif game_mode == "combat":
-            monster = player.current_location.monsters[0]
-            display_combat_state(player, monster, message)
+        available_actions = get_available_actions(player, game_mode)
+        display_menu_and_state(player, message, available_actions)
 
-        # Get user input
-        command = input("> ").lower().strip()
-        if not command:
+        # Get player's choice
+        choice = input("> ")
+        try:
+            choice_index = int(choice) - 1
+            if 0 <= choice_index < len(available_actions):
+                command = available_actions[choice_index]['command']
+            else:
+                message = "Invalid choice."
+                continue
+        except ValueError:
+            message = "Please enter a number."
             continue
 
-        # Process commands based on game mode
-        if game_mode == "explore":
-            parts = command.split()
-            verb = parts[0]
+        # Process the command
+        parts = command.split()
+        verb = parts[0]
 
-            if verb == "quit":
-                print("Thanks for playing!")
-                break
-            elif verb == "look":
-                message = player.current_location.describe()
-            elif verb == "go":
-                if len(parts) > 1:
-                    direction = parts[1]
-                    if player.move(direction):
-                        # Move successful, now check for monsters
-                        if player.current_location.monsters:
-                            game_mode = "combat"
-                            monster = player.current_location.monsters[0]
-                            message = f"You go {direction}, but a wild {monster.name} blocks your path!"
-                        else:
-                            message = f"You go {direction}.\n\n{player.current_location.describe()}"
-                    else:
-                        message = "You can't go that way."
+        if verb == "quit":
+            print("Thanks for playing!")
+            break
+        elif verb == "look":
+            message = player.current_location.describe()
+        elif verb == "go":
+            direction = parts[1]
+            if player.move(direction):
+                if player.current_location.monsters:
+                    game_mode = "encounter"
+                    message = f"You go {direction}, but a wild {player.current_location.monsters[0].name} blocks your path!"
                 else:
-                    message = "Go where?"
-            elif verb == "talk":
-                if len(parts) > 2 and parts[1] == "to":
-                    target_name = " ".join(parts[2:]).strip("'")
-                    found_npc = False
-                    for npc in player.current_location.npcs:
-                        if npc.name.lower() == target_name.lower():
-                            message = f'**{npc.name} says:** "{npc.dialogue}"'
-                            found_npc = True
-                            break
-                    if not found_npc:
-                        message = "There is no one here by that name."
-                else:
-                    message = "Talk to whom?"
-            elif verb == "get":
-                if len(parts) > 1:
-                    item_name = " ".join(parts[1:])
-                    item_to_get = None
-                    for item in player.current_location.items:
-                        if item.name.lower() == item_name.lower():
-                            item_to_get = item
-                            break
-                    if item_to_get:
-                        player.inventory.append(item_to_get)
-                        player.current_location.items.remove(item_to_get)
-                        message = f"You pick up the {item_to_get.name}."
-                    else:
-                        message = "You don't see that here."
-                else:
-                    message = "Get what?"
-            elif verb == "inventory":
-                if player.inventory:
-                    inventory_list = "\n".join(f"- {item.name}: {item.description}" for item in player.inventory)
-                    message = f"You are carrying:\n{inventory_list}"
-                else:
-                    message = "Your inventory is empty."
-            elif verb == "use":
-                if len(parts) > 1:
-                    item_name = " ".join(parts[1:])
-                    item_to_use = None
-                    for item in player.inventory:
-                        if item.name.lower() == item_name.lower():
-                            item_to_use = item
-                            break
-                    if item_to_use:
-                        message = item_to_use.use(player)
-                        if isinstance(item_to_use, Potion):
-                            player.inventory.remove(item_to_use)
-                    else:
-                        message = "You don't have that item."
-                else:
-                    message = "Use what?"
+                    message = f"You go {direction}.\n\n{player.current_location.describe()}"
             else:
-                message = "Unknown command."
+                message = "You can't go that way." # Should not happen with menu
+        elif verb == "talk":
+            target_name = " ".join(parts[2:]).strip("'")
+            npc = next((n for n in player.current_location.npcs if n.name.lower() == target_name.lower()), None)
+            message = f'**{npc.name} says:** "{npc.dialogue}"' if npc else "There is no one here by that name."
+        elif verb == "get":
+            item_name = " ".join(parts[1:]).strip("'")
+            item_to_get = next((i for i in player.current_location.items if i.name.lower() == item_name.lower()), None)
+            if item_to_get:
+                player.inventory.append(item_to_get)
+                player.current_location.items.remove(item_to_get)
+                message = f"You pick up the {item_to_get.name}."
+            else:
+                message = "You don't see that here."
+        elif verb == "inventory":
+            message = f"You are carrying:\n" + "\n".join(f"- {item.name}" for item in player.inventory) if player.inventory else "Your inventory is empty."
+        elif verb == "use":
+            item_name = " ".join(parts[1:]).strip("'")
+            item_to_use = next((i for i in player.inventory if i.name.lower() == item_name.lower()), None)
+            if item_to_use:
+                message = item_to_use.use(player)
+                if isinstance(item_to_use, Potion):
+                    player.inventory.remove(item_to_use)
+            else:
+                message = "You don't have that item."
+        elif verb == "attack":
+            if game_mode == "encounter":
+                game_mode = "combat"
 
-        elif game_mode == "combat":
             monster = player.current_location.monsters[0]
-            if command == "attack":
-                # Player attacks monster
-                monster.hp -= player.attack_power
-                combat_message = f"You attack the {monster.name}, dealing {player.attack_power} damage."
+            monster.hp -= player.attack_power
+            combat_message = f"You attack the {monster.name}, dealing {player.attack_power} damage."
 
-                if monster.is_alive():
-                    # Monster attacks player
-                    player.hp -= monster.attack_power
-                    combat_message += f"\nThe {monster.name} attacks you, dealing {monster.attack_power} damage."
-                else:
-                    # Monster is defeated
-                    combat_message += f"\nYou have defeated the {monster.name}!"
-
-                    # Handle loot drops
-                    if monster.drops:
-                        for drop_data in monster.drops:
-                            # This is a simple factory. Could be expanded.
-                            if drop_data["item_type"] == "Potion":
-                                item = Potion(
-                                    drop_data["name"],
-                                    drop_data["description"],
-                                    drop_data["value"],
-                                    drop_data["heal_amount"]
-                                )
-                                player.current_location.items.append(item)
-                                combat_message += f"\nThe {monster.name} dropped a {item.name}!"
-
-                    player.current_location.monsters.remove(monster)
-                    game_mode = "explore"
-
-                message = combat_message
+            if monster.is_alive():
+                player.hp -= monster.attack_power
+                combat_message += f"\nThe {monster.name} attacks you, dealing {monster.attack_power} damage."
             else:
-                message = "You can't do that in combat. You must [attack]!"
+                combat_message += f"\nYou have defeated the {monster.name}!"
+                if monster.drops:
+                    for drop_data in monster.drops:
+                        if drop_data["item_type"] == "Potion":
+                            item = Potion(drop_data["name"], drop_data["description"], drop_data["value"], drop_data["heal_amount"])
+                            player.current_location.items.append(item)
+                            combat_message += f"\nThe {monster.name} dropped a {item.name}!"
+                player.current_location.monsters.remove(monster)
+                game_mode = "explore"
+            message = combat_message
+        elif verb == "retreat":
+            if game_mode == "encounter":
+                player.retreat()
+                message = f"You retreat to {player.current_location.name}."
+                game_mode = "explore"
+        else:
+            message = "Unknown action."
 
-    # Game Over
     if not player.is_alive():
         print("\nYou have been defeated. Game Over.")
 
