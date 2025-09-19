@@ -1,7 +1,9 @@
 class Character:
-    def __init__(self, name, hp=0, attack_power=0, inventory=None):
+    def __init__(self, id, name, hp=0, attack_power=0, inventory=None):
+        self.id = id
         self.name = name
         self.hp = hp
+        self.max_hp = hp
         self.attack_power = attack_power
         self.inventory = inventory if inventory is not None else []
 
@@ -9,18 +11,19 @@ class Character:
         return self.hp > 0
 
 class NPC(Character):
-    def __init__(self, name, dialogue, hp=0, attack_power=0, inventory=None):
-        super().__init__(name, hp, attack_power, inventory)
+    def __init__(self, id, name, dialogue, hp=0, attack_power=0, inventory=None):
+        super().__init__(id, name, hp, attack_power, inventory)
         self.dialogue = dialogue
 
 class Monster(Character):
-    def __init__(self, name, monster_type, hp, attack_power, drops=None):
-        super().__init__(name, hp, attack_power)
+    def __init__(self, id, name, monster_type, hp, attack_power, drops=None):
+        super().__init__(id, name, hp, attack_power)
         self.monster_type = monster_type
         self.drops = drops if drops is not None else []
 
 class Item:
-    def __init__(self, name, description, value=0):
+    def __init__(self, id, name, description, value=0):
+        self.id = id
         self.name = name
         self.description = description
         self.value = value
@@ -29,8 +32,8 @@ class Item:
         return f"You can't use {self.name}."
 
 class Potion(Item):
-    def __init__(self, name, description, value, heal_amount):
-        super().__init__(name, description, value)
+    def __init__(self, id, name, description, value, heal_amount):
+        super().__init__(id, name, description, value)
         self.heal_amount = heal_amount
 
     def use(self, target):
@@ -38,8 +41,8 @@ class Potion(Item):
         return f"{target.name} uses the {self.name} and heals for {self.heal_amount} HP."
 
 class OffensiveItem(Item):
-    def __init__(self, name, description, value, damage_amount):
-        super().__init__(name, description, value)
+    def __init__(self, id, name, description, value, damage_amount):
+        super().__init__(id, name, description, value)
         self.damage_amount = damage_amount
 
     def use(self, target):
@@ -47,8 +50,8 @@ class OffensiveItem(Item):
         return f"You use the {self.name} on {target.name}, dealing {self.damage_amount} damage!"
 
 class Container(Item):
-    def __init__(self, name, description, value, contained_items=None):
-        super().__init__(name, description, value)
+    def __init__(self, id, name, description, value, contained_items=None):
+        super().__init__(id, name, description, value)
         self.contained_items = contained_items if contained_items is not None else []
 
     def use(self, target_player):
@@ -64,7 +67,8 @@ class Container(Item):
         return message
 
 class Location:
-    def __init__(self, name, description, exits=None, npcs=None, monsters=None, items=None):
+    def __init__(self, id, name, description, exits=None, npcs=None, monsters=None, items=None):
+        self.id = id
         self.name = name
         self.description = description
         self.exits = exits if exits is not None else {}
@@ -113,8 +117,8 @@ class SwampLocation(WildernessLocation):
             return self.hidden_description
 
 class Player(Character):
-    def __init__(self, name, current_location, hp=20, attack_power=5):
-        super().__init__(name, hp, attack_power)
+    def __init__(self, id, name, current_location, hp=20, attack_power=5):
+        super().__init__(id, name, hp, attack_power)
         self.current_location = current_location
         self.previous_location = current_location
 
@@ -133,6 +137,7 @@ import os
 import platform
 import json
 import random
+import copy
 
 def clear_screen():
     """Clears the console screen."""
@@ -168,11 +173,6 @@ def display_menu_and_state(player, message, actions, game_mode):
     print("=" * 40)
     print(f"| {player.name:<10} | HP: {player.hp:<4} | Location: {player.current_location.name:<15} |")
     print("=" * 40)
-
-    if game_mode in ["encounter", "combat"] and player.current_location.monsters:
-        print("\nENEMIES:")
-        for i, monster in enumerate(player.current_location.monsters):
-            print(f"  {i + 1}. {monster.name} (HP: {monster.hp})")
 
     print(f"\n{message}\n")
 
@@ -222,6 +222,8 @@ def get_available_actions(player, game_mode, menus):
                 if "condition" in definition:
                     if definition["condition"] == "is_potion" and not isinstance(it, Potion):
                         continue
+            if definition["condition"] == "is_usable_in_combat" and not isinstance(it, (Potion, OffensiveItem)):
+                continue
 
                 action = definition.copy()
                 if iterator_key == "location.exits":
@@ -255,18 +257,18 @@ def load_world_from_data(game_data):
     for item_id, item_data in game_data.get("items", {}).items():
         item_type = item_data.get("item_type", "Item")
         if item_type == "Potion":
-            all_items[item_id] = Potion(item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("heal_amount", 0))
+            all_items[item_id] = Potion(item_id, item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("heal_amount", 0))
         elif item_type == "Container":
-            all_items[item_id] = Container(item_data["name"], item_data["description"], item_data.get("value", 0))
+            all_items[item_id] = Container(item_id, item_data["name"], item_data["description"], item_data.get("value", 0))
         elif item_type == "OffensiveItem":
-            all_items[item_id] = OffensiveItem(item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("damage_amount", 0))
+            all_items[item_id] = OffensiveItem(item_id, item_data["name"], item_data["description"], item_data.get("value", 0), item_data.get("damage_amount", 0))
         else:
-            all_items[item_id] = Item(item_data["name"], item_data["description"], item_data.get("value", 0))
+            all_items[item_id] = Item(item_id, item_data["name"], item_data["description"], item_data.get("value", 0))
 
     all_monsters = {}
     for monster_id, monster_data in game_data.get("monsters", {}).items():
         all_monsters[monster_id] = Monster(
-            monster_data["name"], monster_data["monster_type"], monster_data["hp"], monster_data["attack_power"]
+            monster_id, monster_data["name"], monster_data["monster_type"], monster_data["hp"], monster_data["attack_power"]
         )
 
     all_npcs = {}
@@ -276,44 +278,38 @@ def load_world_from_data(game_data):
             dialogue = ""
         else:
             dialogue = npc_data["dialogue"]
-        all_npcs[npc_id] = NPC(npc_data["name"], dialogue, npc_data["hp"], npc_data["attack_power"])
+        all_npcs[npc_id] = NPC(npc_id, npc_data["name"], dialogue, npc_data["hp"], npc_data["attack_power"])
 
     all_locations = {}
     for loc_id, loc_data in game_data.get("locations", {}).items():
         loc_type = loc_data.get("location_type", "base")
         if loc_type == "City":
             all_locations[loc_id] = CityLocation(
-                loc_data["name"], loc_data["description"]
+                loc_id, loc_data["name"], loc_data["description"]
             )
         elif loc_type == "Wilderness":
             all_locations[loc_id] = WildernessLocation(
-                loc_data["name"], loc_data["description"],
+                loc_id, loc_data["name"], loc_data["description"],
                 spawn_chance=loc_data.get("spawn_chance", 0.0)
             )
         elif loc_type == "Dungeon":
             all_locations[loc_id] = DungeonLocation(
-                loc_data["name"], loc_data["description"],
+                loc_id, loc_data["name"], loc_data["description"],
                 hazard_description=loc_data.get("hazard_description", "")
             )
         elif loc_type == "Swamp":
             all_locations[loc_id] = SwampLocation(
-                loc_data["name"], loc_data["description"],
+                loc_id, loc_data["name"], loc_data["description"],
                 spawn_chance=loc_data.get("spawn_chance", 0.0),
                 hidden_description=loc_data.get("hidden_description", "")
             )
         else:
             all_locations[loc_id] = Location(
-                loc_data["name"], loc_data["description"]
+                loc_id, loc_data["name"], loc_data["description"]
             )
 
     # --- Linking Pass ---
-    for loc_id, loc_data in game_data.get("locations", {}).items():
-        location = all_locations[loc_id]
-        location.exits = {direction: all_locations[dest_id] for direction, dest_id in loc_data.get("exits", {}).items()}
-        location.npcs = [all_npcs[npc_id] for npc_id in loc_data.get("npc_ids", [])]
-        location.monsters = [all_monsters[monster_id] for monster_id in loc_data.get("monster_ids", [])]
-        location.items = [all_items[item_id] for item_id in loc_data.get("item_ids", [])]
-
+    # Link monster drops and container items first
     for monster_id, monster_data in game_data.get("monsters", {}).items():
         monster = all_monsters[monster_id]
         monster.drops = [all_items[item_id] for item_id in monster_data.get("drop_ids", [])]
@@ -323,12 +319,32 @@ def load_world_from_data(game_data):
             container = all_items[item_id]
             container.contained_items = [all_items[i_id] for i_id in item_data.get("contained_item_ids", [])]
 
+    # Link locations
+    monster_instance_counter = {}
+    for loc_id, loc_data in game_data.get("locations", {}).items():
+        location = all_locations[loc_id]
+        location.exits = {direction: all_locations[dest_id] for direction, dest_id in loc_data.get("exits", {}).items()}
+        location.npcs = [all_npcs[npc_id] for npc_id in loc_data.get("npc_ids", [])]
+
+        location.monsters = []
+        for monster_id in loc_data.get("monster_ids", []):
+            proto_monster = all_monsters[monster_id]
+            new_monster = copy.copy(proto_monster)
+
+            instance_count = monster_instance_counter.get(monster_id, 0)
+            new_monster.id = f"{monster_id}:{instance_count}"
+            monster_instance_counter[monster_id] = instance_count + 1
+
+            location.monsters.append(new_monster)
+
+        location.items = [all_items[item_id] for item_id in loc_data.get("item_ids", [])]
+
     # --- Player Creation ---
     player_data = game_data["player"]
     start_location = all_locations[player_data["start_location_id"]]
     inventory = [all_items[item_id] for item_id in player_data.get("inventory", [])]
     player = Player(
-        player_data["name"], start_location, player_data["hp"], player_data["attack_power"]
+        "player", player_data["name"], start_location, player_data["hp"], player_data["attack_power"]
     )
     player.inventory = inventory
 
@@ -386,8 +402,8 @@ def main():
                 else:
                     message = "You can't go that way."
             elif verb == "get":
-                item_name = " ".join(parts[1:]).strip("'")
-                item = next((i for i in player.current_location.items if i.name.lower() == item_name.lower()), None)
+                item_id = parts[1]
+                item = next((i for i in player.current_location.items if i.id == item_id), None)
                 if item:
                     player.inventory.append(item)
                     player.current_location.items.remove(item)
@@ -397,8 +413,8 @@ def main():
             elif verb == "inventory":
                 message = "You are carrying:\n" + "\n".join(f"- {item.name}" for item in player.inventory) if player.inventory else "Your inventory is empty."
             elif verb == "talk":
-                target_name = " ".join(parts[1:]).strip("'")
-                npc = next((n for n in player.current_location.npcs if n.name.lower() == target_name.lower()), None)
+                npc_id = parts[1]
+                npc = next((n for n in player.current_location.npcs if n.id == npc_id), None)
                 if npc:
                     if npc.dialogue:
                         message = f'**{npc.name} says:** "{npc.dialogue}"'
@@ -407,7 +423,8 @@ def main():
                 else:
                     message = "There is no one here by that name."
             elif verb == "use":
-                item = next((i for i in player.inventory if i.name.lower() == " ".join(parts[1:]).strip("'").lower()), None)
+                item_id = parts[1]
+                item = next((i for i in player.inventory if i.id == item_id), None)
                 if item:
                     message = item.use(player)
                     if isinstance(item, (Potion, Container)):
@@ -420,40 +437,36 @@ def main():
             active_monsters = player.current_location.monsters
 
             if verb == "attack":
-                target = None
-                if len(active_monsters) == 1:
-                    target = active_monsters[0]
-                else:
-                    target = select_from_menu("\nWhich enemy to attack?", active_monsters)
-
+                monster_id = parts[1]
+                target = next((m for m in active_monsters if m.id == monster_id), None)
                 if target:
                     message = f"You attack the {target.name}, dealing {player.attack_power} damage."
                     target.hp -= player.attack_power
                     player_turn_taken = True
                 else:
-                    message = "You decided not to attack."
+                    message = "That monster isn't here."
 
             elif verb == "use":
-                usable_items = [item for item in player.inventory if isinstance(item, (Potion, OffensiveItem))]
-                if not usable_items:
-                    message = "You have no usable items in combat."
-                else:
-                    item_to_use = select_from_menu("\nWhich item to use?", usable_items)
-                    if item_to_use:
-                        if isinstance(item_to_use, OffensiveItem):
-                            target = select_from_menu(f"\nUse {item_to_use.name} on which enemy?", active_monsters)
-                            if target:
-                                message = item_to_use.use(target)
-                                player.inventory.remove(item_to_use)
-                                player_turn_taken = True
-                            else:
-                                message = "You decided not to use the item."
-                        else: # Potion
-                            message = item_to_use.use(player)
+                item_id = parts[1]
+                item_to_use = next((i for i in player.inventory if i.id == item_id), None)
+
+                if item_to_use:
+                    if isinstance(item_to_use, OffensiveItem):
+                        target = select_from_menu(f"\nUse {item_to_use.name} on which enemy?", active_monsters)
+                        if target:
+                            message = item_to_use.use(target)
                             player.inventory.remove(item_to_use)
                             player_turn_taken = True
+                        else:
+                            message = "You decided not to use the item."
+                    elif isinstance(item_to_use, Potion):
+                        message = item_to_use.use(player)
+                        player.inventory.remove(item_to_use)
+                        player_turn_taken = True
                     else:
-                        message = "You decided not to use an item."
+                        message = f"You can't use {item_to_use.name} in combat."
+                else:
+                    message = "You don't have that item."
 
             elif verb == "retreat":
                 retreat_message = "You flee from combat!"

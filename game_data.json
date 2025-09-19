@@ -126,13 +126,13 @@
       { "text": "Look around", "command": "look" },
       { "text": "View inventory", "command": "inventory" },
       { "text": "Go {direction} -> {destination.name}", "command": "go {direction}", "iterate": "location.exits" },
-      { "text": "Talk to {npc.name}", "command": "talk to '{npc.name}'", "iterate": "location.npcs" },
-      { "text": "Get {item.name}", "command": "get '{item.name}'", "iterate": "location.items" },
-      { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" }
+      { "text": "Talk to {npc.name}", "command": "talk {npc.id}", "iterate": "location.npcs" },
+      { "text": "Get {item.name}", "command": "get {item.id}", "iterate": "location.items" },
+      { "text": "Use {item.name}", "command": "use {item.id}", "iterate": "player.inventory", "condition": "is_potion" }
     ],
     "combat": [
-      { "text": "Attack an enemy", "command": "attack" },
-      { "text": "Use an item", "command": "use", "condition": "has_usable_item" },
+      { "text": "Attack {monster.name} (HP: {monster.hp}/{monster.max_hp})", "command": "attack {monster.id}", "iterate": "location.monsters" },
+      { "text": "Use {item.name}", "command": "use {item.id}", "iterate": "player.inventory", "condition": "is_usable_in_combat" },
       { "text": "Retreat from combat", "command": "retreat" }
     ],
     "always": [
