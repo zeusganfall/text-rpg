@@ -1,50 +1,81 @@
 {
+  "player": {
+    "name": "Hero",
+    "hp": 20,
+    "attack_power": 5,
+    "start_location_id": "oakhaven",
+    "inventory": []
+  },
   "locations": {
     "oakhaven": {
       "name": "Oakhaven",
       "description": "A peaceful village nestled in a clearing. The smell of fresh bread fills the air.",
-      "exits": {
-        "north": "whispering_woods"
-      },
-      "npcs": [
-        {
-          "name": "Old Man Willow",
-          "dialogue": "Hmph. The world isn't as quiet as it used to be."
-        }
-      ]
+      "exits": { "north": "whispering_woods" },
+      "npc_ids": ["old_man_willow"],
+      "monster_ids": [],
+      "item_ids": []
     },
     "whispering_woods": {
       "name": "Whispering Woods",
       "description": "A dense forest where the trees seem to whisper secrets. It's easy to get lost here.",
-      "exits": {
-        "south": "oakhaven",
-        "east": "goblin_cave"
-      },
-      "monsters": [
-        {
-          "name": "Goblin",
-          "monster_type": "Goblin",
-          "hp": 10,
-          "attack_power": 3,
-          "drops": [
-            {
-              "item_type": "Potion",
-              "name": "Healing Potion",
-              "description": "A simple potion that restores 10 health.",
-              "value": 5,
-              "heal_amount": 10
-            }
-          ]
-        }
-      ]
+      "exits": { "south": "oakhaven", "east": "goblin_cave" },
+      "npc_ids": [],
+      "monster_ids": ["goblin_1"],
+      "item_ids": []
     },
     "goblin_cave": {
       "name": "Goblin Cave",
       "description": "A dark and damp cave, home to a clan of mischievous goblins.",
-      "exits": {
-        "west": "whispering_woods"
-      }
+      "exits": { "west": "whispering_woods" },
+      "npc_ids": [],
+      "monster_ids": [],
+      "item_ids": []
     }
   },
-  "start_location": "oakhaven"
+  "npcs": {
+    "old_man_willow": {
+      "name": "Old Man Willow",
+      "dialogue": "Hmph. The world isn't as quiet as it used to be.",
+      "hp": 10,
+      "attack_power": 0
+    }
+  },
+  "monsters": {
+    "goblin_1": {
+      "name": "Goblin",
+      "monster_type": "Goblin",
+      "hp": 10,
+      "attack_power": 3,
+      "drop_ids": ["healing_potion_1"]
+    }
+  },
+  "items": {
+    "healing_potion_1": {
+      "item_type": "Potion",
+      "name": "Healing Potion",
+      "description": "A simple potion that restores 10 health.",
+      "value": 5,
+      "heal_amount": 10
+    }
+  },
+  "menus": {
+    "explore": [
+      { "text": "Look around", "command": "look" },
+      { "text": "View inventory", "command": "inventory" },
+      { "text": "Go {direction}", "command": "go {direction}", "iterate": "location.exits" },
+      { "text": "Talk to {npc.name}", "command": "talk to '{npc.name}'", "iterate": "location.npcs" },
+      { "text": "Get {item.name}", "command": "get '{item.name}'", "iterate": "location.items" },
+      { "text": "Use {item.name}", "command": "use '{item.name}'", "iterate": "player.inventory", "condition": "is_potion" }
+    ],
+    "encounter": [
+      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" },
+      { "text": "Retreat", "command": "retreat" }
+    ],
+    "combat": [
+      { "text": "Attack the {monster.name}", "command": "attack", "iterate": "location.monsters" }
+    ],
+    "always": [
+      { "text": "Quit game", "command": "quit" }
+    ]
+  }
 }
